@@ -9,5 +9,6 @@ struct LiteBudgetApp: App {
             SettingsView()
                 .environment(statusBarController.viewModel)
         }
+        .windowResizability(.contentMinSize)
     }
 }

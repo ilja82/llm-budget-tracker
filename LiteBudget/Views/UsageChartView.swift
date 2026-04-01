@@ -3,13 +3,16 @@ import Charts
 
 struct UsageChartView: View {
     let data: [(date: Date, amount: Double)]
-    var safeDailySpend: Double? = nil
+    var safeLine: [(date: Date, amount: Double)] = []
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 chartSummaryRow
                 chartBody
+                if let safe = currentSafeDailySpend {
+                    safeSpendCallout(safe)
+                }
             }
         } label: {
             Label("Daily Spend", systemImage: "chart.bar.fill")
@@ -21,10 +24,7 @@ struct UsageChartView: View {
 
     private var chartSummaryRow: some View {
         HStack(spacing: 12) {
-            summaryItem(label: "7-day avg", value: String(format: "$%.3f", sevenDayAverage))
-            if let safe = safeDailySpend {
-                summaryItem(label: "Safe daily", value: String(format: "$%.3f", safe))
-            }
+            summaryItem(label: "7-day avg", value: String(format: "$%.2f", sevenDayAverage))
             Spacer()
             trendIndicator
         }
@@ -55,6 +55,28 @@ struct UsageChartView: View {
         }
     }
 
+    private func safeSpendCallout(_ safe: Double) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Daily spend")
+                .font(.system(size: 9))
+                .foregroundStyle(.green.opacity(0.85))
+            Text(String(format: "Up to $%.2f/day", safe))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.green)
+            Text("Stay at or under this amount per day to finish within budget.")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.green.opacity(0.08))
+        )
+    }
+
     // MARK: - Chart
 
     private var chartBody: some View {
@@ -64,20 +86,34 @@ struct UsageChartView: View {
                     x: .value("Date", point.date, unit: .day),
                     y: .value("Spend ($)", point.amount)
                 )
-                .foregroundStyle(barColor(for: point.amount))
+                .foregroundStyle(barColor(for: point))
                 .cornerRadius(2)
             }
 
-            if let safe = safeDailySpend, safe > 0 {
-                RuleMark(y: .value("Safe daily", safe))
+            if !safeLine.isEmpty {
+                ForEach(safeLine, id: \.date) { point in
+                    LineMark(
+                        x: .value("Safe Date", point.date, unit: .day),
+                        y: .value("Safe daily", point.amount)
+                    )
+                    .interpolationMethod(.linear)
                     .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                    .foregroundStyle(.green.opacity(0.7))
+                    .foregroundStyle(.green.opacity(0.75))
+                }
+
+                if let lastSafePoint = safeLine.last {
+                    PointMark(
+                        x: .value("Safe Label Date", lastSafePoint.date, unit: .day),
+                        y: .value("Safe Label Amount", lastSafePoint.amount)
+                    )
+                    .opacity(0.001)
                     .annotation(position: .top, alignment: .trailing) {
                         Text("Safe")
                             .font(.system(size: 8))
                             .foregroundStyle(.green.opacity(0.85))
                             .padding(.trailing, 2)
                     }
+                }
             }
         }
         .chartXAxis {
@@ -90,7 +126,7 @@ struct UsageChartView: View {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
-                        Text(String(format: "$%.3f", v)).font(.system(size: 9))
+                        Text(String(format: "$%.0f", v)).font(.system(size: 9))
                     }
                 }
             }
@@ -106,15 +142,27 @@ struct UsageChartView: View {
         return recent.map(\.amount).reduce(0, +) / Double(recent.count)
     }
 
-    private var strideCount: Int {
-        max(1, data.count / 6)
+    private var currentSafeDailySpend: Double? {
+        safeLine.first(where: { Calendar.current.isDateInToday($0.date) })?.amount ?? safeLine.last?.amount
     }
 
-    private func barColor(for amount: Double) -> Color {
-        guard let safe = safeDailySpend, safe > 0 else { return Color.accentColor }
-        if amount > safe * 1.2 { return .red }
-        if amount > safe { return .orange }
+    private var strideCount: Int {
+        max(1, max(data.count, safeLine.count) / 6)
+    }
+
+    private func barColor(for point: (date: Date, amount: Double)) -> Color {
+        guard let safe = safeLimit(for: point.date), safe > 0 else {
+            return Color.accentColor
+        }
+        if point.amount > safe * 1.2 { return .red }
+        if point.amount > safe { return .orange }
         return Color.accentColor
+    }
+
+    private func safeLimit(for date: Date?) -> Double? {
+        guard let date else { return nil }
+        let day = Calendar.current.startOfDay(for: date)
+        return safeLine.first(where: { Calendar.current.isDate($0.date, inSameDayAs: day) })?.amount
     }
 }
 
@@ -128,7 +176,8 @@ struct UsageChartView: View {
         let amount = Double.random(in: 0.001...0.012)
         return (date: date, amount: amount)
     }
-    return UsageChartView(data: data, safeDailySpend: 0.007)
+    let safeLine = data.map { (date: $0.date, amount: 0.007) }
+    return UsageChartView(data: data, safeLine: safeLine)
         .padding()
         .frame(width: 320)
 }

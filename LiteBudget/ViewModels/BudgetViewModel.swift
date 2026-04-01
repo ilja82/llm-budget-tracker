@@ -184,6 +184,44 @@ final class BudgetViewModel {
             .sorted { $0.date < $1.date }
     }
 
+    var safeSpendLine: [(date: Date, amount: Double)] {
+        guard let info = budgetInfo,
+              let maxBudget = info.maxBudget,
+              maxBudget > 0,
+              let resetAt = info.budgetResetAt,
+              let durationStr = info.budgetDuration,
+              let totalDays = parseDurationDays(durationStr) else { return [] }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let startDate = calendar.startOfDay(
+            for: calendar.date(byAdding: .day, value: -totalDays, to: resetAt) ?? Date()
+        )
+        let spendByDay = Dictionary(uniqueKeysWithValues: dailySpend.map {
+            (calendar.startOfDay(for: $0.date), $0.amount)
+        })
+
+        var line: [(date: Date, amount: Double)] = []
+        var cumulativeSpend = 0.0
+
+        for dayOffset in 0..<totalDays {
+            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
+
+            let daysIncludingCurrent = max(totalDays - dayOffset, 1)
+            let remainingBudget = max(maxBudget - cumulativeSpend, 0)
+            let safeAmount = remainingBudget / Double(daysIncludingCurrent)
+            line.append((date: date, amount: safeAmount))
+
+            if date < today {
+                cumulativeSpend += spendByDay[date] ?? 0
+            } else {
+                cumulativeSpend += safeAmount
+            }
+        }
+
+        return line
+    }
+
     var relativeLastUpdated: String {
         guard let last = lastUpdated else { return "" }
         let elapsed = Int(-last.timeIntervalSinceNow)
@@ -222,11 +260,17 @@ final class BudgetViewModel {
             return
         }
         guard !endpointURL.isEmpty else {
+            budgetInfo = nil
+            spendLogs = []
+            pacingInfo = nil
             appState = .notConfigured
             isLoading = false
             return
         }
         guard let apiKey = try? KeychainService.load(), !apiKey.isEmpty else {
+            budgetInfo = nil
+            spendLogs = []
+            pacingInfo = nil
             appState = .notConfigured
             isLoading = false
             return
@@ -240,6 +284,8 @@ final class BudgetViewModel {
             let info = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
             guard info.maxBudget != nil else {
                 budgetInfo = info
+                spendLogs = []
+                pacingInfo = nil
                 appState = .noBudget
                 return
             }
@@ -294,39 +340,51 @@ final class BudgetViewModel {
 
     @MainActor
     private func injectDevData() {
-        let daysPassed = max(1, devMode.totalDays - devMode.daysRemaining)
-        let resetAt = Calendar.current.date(byAdding: .day, value: devMode.daysRemaining, to: Date()) ?? Date()
+        let totalDays = max(devMode.totalDays, 1)
+        let daysRemaining = min(max(devMode.daysRemaining, 0), totalDays)
+        let daysPassed = max(totalDays - daysRemaining, 1)
+        let resetAt = Calendar.current.date(byAdding: .day, value: daysRemaining, to: Date()) ?? Date()
         let fakeBudgetInfo = BudgetInfo(
             userId: "dev-mode",
             spend: devMode.spend,
             maxBudget: devMode.maxBudget,
-            budgetDuration: "\(devMode.totalDays)d",
+            budgetDuration: "\(totalDays)d",
             budgetResetAt: resetAt,
             userEmail: "dev@test.local"
         )
         budgetInfo = fakeBudgetInfo
-        spendLogs = generateFakeSpendLogs(daysPassed: daysPassed)
+        spendLogs = generateFakeSpendLogs(daysPassed: daysPassed, totalSpend: devMode.spend)
         computePacing(from: fakeBudgetInfo)
         lastUpdated = Date()
         errorMessage = nil
     }
 
-    private func generateFakeSpendLogs(daysPassed: Int) -> [SpendLog] {
+    private func generateFakeSpendLogs(daysPassed: Int, totalSpend: Double) -> [SpendLog] {
         guard daysPassed > 0 else { return [] }
-        let dailyAvg = devMode.spend / Double(daysPassed)
+        let dailyAvg = totalSpend / Double(daysPassed)
+        let weights = (0..<daysPassed).map { _ in Double.random(in: 0.5...1.5) }
+        let totalWeight = max(weights.reduce(0, +), 0.0001)
+
         return (0..<daysPassed).map { i in
             let daysBack = daysPassed - i - 1
             let date = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-            let variation = Double.random(in: 0.5...1.5)
-            return SpendLog(spend: max(0.001, dailyAvg * variation), startTime: date)
+            let normalizedSpend = max(0.001, totalSpend * (weights[i] / totalWeight))
+            return SpendLog(
+                spend: totalSpend > 0 ? normalizedSpend : dailyAvg,
+                startTime: date
+            )
         }
     }
 
     // MARK: - Helpers
 
     private func fetchLogs(apiKey: String, info: BudgetInfo) async {
-        guard let resetAt = info.budgetResetAt, let duration = info.budgetDuration else { return }
-        let days = parseDurationDays(duration)
+        guard let resetAt = info.budgetResetAt,
+              let duration = info.budgetDuration,
+              let days = parseDurationDays(duration) else {
+            spendLogs = []
+            return
+        }
         let startDate = Calendar.current.date(byAdding: .day, value: -days, to: resetAt) ?? Date()
         spendLogs = (try? await api.fetchSpendLogs(
             baseURL: endpointURL,
@@ -338,11 +396,17 @@ final class BudgetViewModel {
     private func computePacing(from info: BudgetInfo) {
         guard let maxBudget = info.maxBudget, maxBudget > 0,
               let resetAt = info.budgetResetAt,
-              let durationStr = info.budgetDuration else { return }
+              let durationStr = info.budgetDuration,
+              let totalDays = parseDurationDays(durationStr) else {
+            pacingInfo = nil
+            return
+        }
 
-        let totalDays = parseDurationDays(durationStr)
         let startDate = Calendar.current.date(byAdding: .day, value: -totalDays, to: resetAt) ?? Date()
-        let daysPassed = max(1, Calendar.current.dateComponents([.day], from: startDate, to: Date()).day ?? 1)
+        let daysPassed = min(
+            max(1, Calendar.current.dateComponents([.day], from: startDate, to: Date()).day ?? 1),
+            totalDays
+        )
         let daysRemaining = max(0, Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0)
         let expectedUse = maxBudget * (Double(daysPassed) / Double(totalDays))
         let dailyRate = info.spend / Double(daysPassed)
@@ -359,12 +423,21 @@ final class BudgetViewModel {
         )
     }
 
-    /// Parses "30d", "24h", "1m" → number of days
-    private func parseDurationDays(_ duration: String) -> Int {
+    /// Parses "30d", "24h", "1m" into a finite number of days.
+    /// Returns nil for indefinite periods so callers can avoid open-ended loops.
+    private func parseDurationDays(_ duration: String) -> Int? {
         let s = duration.lowercased()
-        if s.hasSuffix("d"), let n = Int(s.dropLast()) { return n }
-        if s.hasSuffix("h"), let n = Int(s.dropLast()) { return max(1, n / 24) }
-        if s.hasSuffix("m"), let n = Int(s.dropLast()) { return max(1, n * 30) }
+        if s.contains("indefinite") || s == "none" || s == "never" {
+            return nil
+        }
+        if s == "daily" { return 1 }
+        if s == "weekly" { return 7 }
+        if s == "monthly" { return 30 }
+        if s.hasSuffix("d"), let n = Int(s.dropLast()) { return max(n, 1) }
+        if s.hasSuffix("s"), let n = Int(s.dropLast()) { return max(1, Int(ceil(Double(n) / 86_400.0))) }
+        if s.hasSuffix("h"), let n = Int(s.dropLast()) { return max(1, Int(ceil(Double(n) / 24.0))) }
+        if s.hasSuffix("m"), let n = Int(s.dropLast()) { return max(1, Int(ceil(Double(n) / 1_440.0))) }
+        if s.hasSuffix("mo"), let n = Int(s.dropLast(2)) { return max(1, n * 30) }
         return 30
     }
 

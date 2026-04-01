@@ -50,54 +50,8 @@ struct StatsView: View {
                         pacing: viewModel.pacingInfo,
                         budgetPercentage: viewModel.budgetPercentage
                     )
-                    if let pacing = viewModel.pacingInfo {
-                        statChipsRow(info: info, pacing: pacing)
-                    }
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func statChipsRow(info: BudgetInfo, pacing: PacingInfo) -> some View {
-        HStack(spacing: 6) {
-            if let resetAt = info.budgetResetAt {
-                let days = Swift.max(0, Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0)
-                StatChip(
-                    icon: "calendar",
-                    label: "Days left",
-                    value: "\(days)",
-                    color: daysColor(days: days, total: pacing.totalDays)
-                )
-            }
-            StatChip(
-                icon: "dollarsign.circle",
-                label: "Safe daily",
-                value: String(format: "$%.2f", pacing.safeDailySpend),
-                color: .green
-            )
-            StatChip(
-                icon: pacing.status.icon,
-                label: "Pacing",
-                value: pacing.status.label,
-                color: pacingChipColor(pacing.status)
-            )
-        }
-    }
-
-    private func daysColor(days: Int, total: Int) -> Color {
-        guard total > 0 else { return .secondary }
-        let frac = Double(days) / Double(total)
-        return frac < 0.15 ? .red : frac < 0.30 ? .orange : .secondary
-    }
-
-    private func pacingChipColor(_ status: PacingStatus) -> Color {
-        switch status {
-        case .underPace: return .green
-        case .onTrack: return Color.accentColor
-        case .nearLimit: return .orange
-        case .overPace: return .red
-        case .unknown: return .secondary
         }
     }
 
@@ -124,11 +78,6 @@ struct BudgetHeroCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
     let budgetPercentage: Double
-
-    private var remaining: Double {
-        guard let max = info.maxBudget else { return 0 }
-        return Swift.max(max - info.spend, 0)
-    }
 
     private var heroColor: Color {
         budgetPercentage > 0.9 ? .red : budgetPercentage > 0.75 ? .orange : .green
@@ -222,6 +171,7 @@ struct StatChip: View {
     let icon: String
     let label: String
     let value: String
+    var detail: String? = nil
     var color: Color = .secondary
 
     var body: some View {
@@ -239,6 +189,13 @@ struct StatChip: View {
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)

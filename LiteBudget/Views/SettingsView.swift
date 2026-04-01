@@ -26,7 +26,8 @@ struct SettingsView: View {
             versionFooter
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: devModeUnlocked ? 600 : 520)
+        .frame(minWidth: 400, idealWidth: 400, maxWidth: 400)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             proxyURL = viewModel.endpointURL
         }
@@ -192,11 +193,15 @@ struct SettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(devModeUnlocked ? Color.orange.opacity(0.6) : Color.secondary.opacity(0.5))
                     .onTapGesture {
-                        guard !devModeUnlocked else { return }
                         versionTapCount += 1
                         if versionTapCount >= 7 {
-                            devModeUnlocked = true
-                            UserDefaults.standard.set(true, forKey: "devMode.unlocked")
+                            versionTapCount = 0
+                            devModeUnlocked.toggle()
+                            UserDefaults.standard.set(devModeUnlocked, forKey: "devMode.unlocked")
+                            if !devModeUnlocked, viewModel.devMode.isEnabled {
+                                viewModel.devMode.isEnabled = false
+                                Task { await viewModel.refresh() }
+                            }
                         }
                     }
                 Spacer()

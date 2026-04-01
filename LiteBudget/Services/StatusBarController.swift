@@ -7,6 +7,7 @@ final class StatusBarController {
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
+    private weak var hostingViewController: NSViewController?
 
     init() {
         setupPopover()
@@ -19,11 +20,14 @@ final class StatusBarController {
     private func setupPopover() {
         popover.behavior = .transient
         popover.animates = true
-        popover.contentViewController = NSHostingController(
+        popover.contentSize = NSSize(width: 320, height: 420)
+        let controller = NSHostingController(
             rootView: PopoverView(closePopover: { [weak self] in
                 self?.popover.performClose(nil)
             }).environment(viewModel)
         )
+        hostingViewController = controller
+        popover.contentViewController = controller
     }
 
     private func setupButton() {
@@ -41,7 +45,12 @@ final class StatusBarController {
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            updatePopoverSize()
             popover.contentViewController?.view.window?.makeKey()
+            DispatchQueue.main.async { [weak self] in
+                self?.popover.contentViewController?.view.window?.makeFirstResponder(nil)
+                self?.updatePopoverSize()
+            }
         }
     }
 
@@ -67,12 +76,22 @@ final class StatusBarController {
             _ = viewModel.pacingBarNSColor
             _ = viewModel.menuBarTooltip
             _ = viewModel.appState
+            _ = viewModel.dailySpend.count
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.updateImage()
+                self?.updatePopoverSize()
                 self?.observeViewModel()
             }
         }
+    }
+
+    private func updatePopoverSize() {
+        guard let view = hostingViewController?.view else { return }
+        view.layoutSubtreeIfNeeded()
+        let fittedHeight = view.fittingSize.height
+        let clampedHeight = min(max(fittedHeight, 320), 700)
+        popover.contentSize = NSSize(width: 320, height: clampedHeight)
     }
 }
 

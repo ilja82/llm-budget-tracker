@@ -25,7 +25,7 @@ struct PopoverView: View {
                         if !viewModel.dailySpend.isEmpty {
                             UsageChartView(
                                 data: viewModel.dailySpend,
-                                safeDailySpend: viewModel.pacingInfo?.safeDailySpend
+                                safeLine: viewModel.safeSpendLine
                             )
                         }
                     }
@@ -35,7 +35,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 320, height: 550)
+        .frame(width: 320)
         .environment(viewModel)
     }
 
@@ -63,7 +63,6 @@ struct PopoverView: View {
 
     private var notConfiguredView: some View {
         VStack(spacing: 16) {
-            Spacer()
             Image(systemName: "link.circle")
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
@@ -82,10 +81,9 @@ struct PopoverView: View {
                 DispatchQueue.main.async { openSettings() }
             }
             .buttonStyle(.borderedProminent)
-            Spacer()
         }
         .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     private var footer: some View {

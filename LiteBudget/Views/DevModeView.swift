@@ -15,7 +15,8 @@ struct DevModeView: View {
             }
             .formStyle(.grouped)
         }
-        .frame(width: 380, height: 500)
+        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var devModeHeader: some View {
