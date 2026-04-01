@@ -54,7 +54,7 @@ struct PopoverView: View {
             }
             Spacer()
             if viewModel.appState == .loading || viewModel.appState == .refreshing || isRefreshing {
-                ProgressView().scaleEffect(0.6)
+                ProgressView().controlSize(.small)
             }
             Button {
                 closePopover?()
@@ -112,21 +112,23 @@ struct PopoverView: View {
                 }
             }
             if viewModel.lastUpdated != nil || viewModel.nextRefreshMinutes != nil {
-                HStack {
-                    if !viewModel.relativeLastUpdated.isEmpty {
-                        Text("Updated:")
-                            .foregroundStyle(.secondary)
-                        Text(viewModel.relativeLastUpdated)
+                TimelineView(.periodic(from: .now, by: 60)) { _ in
+                    HStack {
+                        if !viewModel.relativeLastUpdated.isEmpty {
+                            Text("Updated:")
+                                .foregroundStyle(.secondary)
+                            Text(viewModel.relativeLastUpdated)
+                        }
+                        Spacer()
+                        if let mins = viewModel.nextRefreshMinutes {
+                            Text("Next refresh in:")
+                                .foregroundStyle(.secondary)
+                            Text("\(mins) min")
+                        }
                     }
-                    Spacer()
-                    if let mins = viewModel.nextRefreshMinutes {
-                        Text("Next refresh in:")
-                            .foregroundStyle(.secondary)
-                        Text("\(mins) min")
-                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
                 }
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
             }
             if !autoStartEnabled {
                 Text("Tip: Enable \"Launch at Login\" in Settings.")
