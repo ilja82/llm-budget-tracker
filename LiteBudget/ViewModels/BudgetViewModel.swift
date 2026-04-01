@@ -257,7 +257,7 @@ final class BudgetViewModel {
             isLoading = true
             injectDevData()
             isLoading = false
-            appState = .loaded
+            appState = devMode.hasMaxBudget ? .loaded : .noBudget
             return
         }
         guard !endpointURL.isEmpty else {
@@ -348,9 +348,9 @@ final class BudgetViewModel {
         let fakeBudgetInfo = BudgetInfo(
             userId: "dev-mode",
             spend: devMode.spend,
-            maxBudget: devMode.maxBudget,
-            budgetDuration: "\(totalDays)d",
-            budgetResetAt: resetAt,
+            maxBudget: devMode.hasMaxBudget ? devMode.maxBudget : nil,
+            budgetDuration: devMode.hasReset ? "\(totalDays)d" : nil,
+            budgetResetAt: devMode.hasReset ? resetAt : nil,
             userEmail: "dev@test.local"
         )
         budgetInfo = fakeBudgetInfo

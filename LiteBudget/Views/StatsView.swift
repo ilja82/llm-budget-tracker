@@ -193,8 +193,22 @@ struct BudgetBar: View {
                     context.stroke(dp, with: .color(.primary.opacity(0.4)), lineWidth: 1.5)
                     dashY += 5
                 }
+
+                // Projected total marker (upward triangle below bar)
+                if !pacing.isOverBudget {
+                    let projX = xPos(pacing.predictedTotal)
+                    let triTip = barY + barH + 3
+                    let triBase = triTip + 5
+                    let triHalfW: CGFloat = 4
+                    var projPath = Path()
+                    projPath.move(to: CGPoint(x: projX, y: triTip))
+                    projPath.addLine(to: CGPoint(x: projX - triHalfW, y: triBase))
+                    projPath.addLine(to: CGPoint(x: projX + triHalfW, y: triBase))
+                    projPath.closeSubpath()
+                    context.fill(projPath, with: .color(.secondary.opacity(0.6)))
+                }
             }
-            .frame(height: 20)
+            .frame(height: 26)
 
             // Legend
             HStack(spacing: 0) {
@@ -209,9 +223,8 @@ struct BudgetBar: View {
                             .foregroundStyle(.red)
                     }
                 } else {
-                    Text(String(format: "$%.2f proj · ", pacing.predictedTotal))
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
+                    legendItem(indicator: .triangle, label: String(format: "$%.2f projected", pacing.predictedTotal))
+                    Spacer()
                 }
                 legendItem(indicator: .solid, label: String(format: "$%.2f max", pacing.maxBudget))
             }
@@ -219,7 +232,7 @@ struct BudgetBar: View {
     }
 
     private enum Indicator {
-        case dot(Color), dashed, solid
+        case dot(Color), dashed, solid, triangle
     }
 
     @ViewBuilder
@@ -240,6 +253,16 @@ struct BudgetBar: View {
                 Rectangle()
                     .fill(Color.primary.opacity(0.55))
                     .frame(width: 2, height: 10)
+            case .triangle:
+                Canvas { ctx, sz in
+                    var p = Path()
+                    p.move(to: CGPoint(x: sz.width / 2, y: 0))
+                    p.addLine(to: CGPoint(x: 0, y: sz.height))
+                    p.addLine(to: CGPoint(x: sz.width, y: sz.height))
+                    p.closeSubpath()
+                    ctx.fill(p, with: .color(.secondary.opacity(0.6)))
+                }
+                .frame(width: 8, height: 6)
             }
             Text(label)
                 .font(.system(size: 9))

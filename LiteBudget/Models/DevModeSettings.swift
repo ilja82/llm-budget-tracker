@@ -15,11 +15,25 @@ final class DevModeSettings {
         didSet { UserDefaults.standard.set(spend, forKey: "devMode.spend") }
     }
 
+    var hasMaxBudget: Bool = {
+        guard UserDefaults.standard.object(forKey: "devMode.hasMaxBudget") != nil else { return true }
+        return UserDefaults.standard.bool(forKey: "devMode.hasMaxBudget")
+    }() {
+        didSet { UserDefaults.standard.set(hasMaxBudget, forKey: "devMode.hasMaxBudget") }
+    }
+
     var maxBudget: Double = {
         let v = UserDefaults.standard.double(forKey: "devMode.maxBudget")
         return v > 0 ? v : 100.00
     }() {
         didSet { UserDefaults.standard.set(maxBudget, forKey: "devMode.maxBudget") }
+    }
+
+    var hasReset: Bool = {
+        guard UserDefaults.standard.object(forKey: "devMode.hasReset") != nil else { return true }
+        return UserDefaults.standard.bool(forKey: "devMode.hasReset")
+    }() {
+        didSet { UserDefaults.standard.set(hasReset, forKey: "devMode.hasReset") }
     }
 
     var daysRemaining: Int = {

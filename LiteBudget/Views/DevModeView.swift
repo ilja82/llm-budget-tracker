@@ -58,31 +58,45 @@ struct DevModeView: View {
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
             }
+            Toggle("Budget limit", isOn: dev.hasMaxBudget)
+                .onChange(of: dev.wrappedValue.hasMaxBudget) { _, _ in
+                    Task { await viewModel.refresh() }
+                }
             HStack {
                 Text("Max Budget")
+                    .foregroundStyle(dev.wrappedValue.hasMaxBudget ? .primary : .secondary)
                 Spacer()
                 TextField("0.00", value: dev.maxBudget, format: .currency(code: "USD"))
                     .frame(width: 100)
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
+                    .disabled(!dev.wrappedValue.hasMaxBudget)
             }
+            Toggle("Budget reset", isOn: dev.hasReset)
+                .onChange(of: dev.wrappedValue.hasReset) { _, _ in
+                    Task { await viewModel.refresh() }
+                }
             HStack {
                 Text("Days Remaining")
+                    .foregroundStyle(dev.wrappedValue.hasReset ? .primary : .secondary)
                 Spacer()
                 TextField("0", value: dev.daysRemaining, format: .number)
                     .frame(width: 60)
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
+                    .disabled(!dev.wrappedValue.hasReset)
                 Text("days")
                     .foregroundStyle(.secondary)
             }
             HStack {
                 Text("Budget Period")
+                    .foregroundStyle(dev.wrappedValue.hasReset ? .primary : .secondary)
                 Spacer()
                 TextField("0", value: dev.totalDays, format: .number)
                     .frame(width: 60)
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
+                    .disabled(!dev.wrappedValue.hasReset)
                 Text("days total")
                     .foregroundStyle(.secondary)
             }
