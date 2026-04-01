@@ -24,7 +24,6 @@ struct UsageChartView: View {
 
     private var chartSummaryRow: some View {
         HStack(spacing: 12) {
-            summaryItem(label: "7-day avg", value: String(format: "$%.2f", sevenDayAverage))
             Spacer()
             trendIndicator
         }
@@ -45,28 +44,18 @@ struct UsageChartView: View {
         }
     }
 
-    private func summaryItem(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 11, weight: .semibold))
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-        }
-    }
-
     private func safeSpendCallout(_ safe: Double) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 9))
-                Text("Safe daily limit")
+                Text("Optimum daily spend: ")
                     .font(.system(size: 9))
+                Text(String(format: "$%.2f/day", safe))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.green)
             }
             .foregroundStyle(.green.opacity(0.85))
-            Text(String(format: "$%.2f/day", safe))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.green)
             Text("Stay at or under this amount per day to finish within budget.")
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
@@ -112,7 +101,7 @@ struct UsageChartView: View {
                     )
                     .opacity(0.001)
                     .annotation(position: .top, alignment: .trailing) {
-                        Text("Safe")
+                        Text("Optimum")
                             .font(.system(size: 8))
                             .foregroundStyle(.green.opacity(0.85))
                             .padding(.trailing, 2)
@@ -139,12 +128,6 @@ struct UsageChartView: View {
     }
 
     // MARK: - Helpers
-
-    private var sevenDayAverage: Double {
-        let recent = Array(data.suffix(7))
-        guard !recent.isEmpty else { return 0 }
-        return recent.map(\.amount).reduce(0, +) / Double(recent.count)
-    }
 
     private var currentSafeDailySpend: Double? {
         safeLine.first(where: { Calendar.current.isDateInToday($0.date) })?.amount ?? safeLine.last?.amount

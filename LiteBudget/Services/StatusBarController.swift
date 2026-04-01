@@ -20,7 +20,7 @@ final class StatusBarController {
     private func setupPopover() {
         popover.behavior = .transient
         popover.animates = true
-        popover.contentSize = NSSize(width: 320, height: 420)
+        popover.contentSize = NSSize(width: 420, height: 420)
         let controller = NSHostingController(
             rootView: PopoverView(closePopover: { [weak self] in
                 self?.popover.performClose(nil)
@@ -91,7 +91,7 @@ final class StatusBarController {
         view.layoutSubtreeIfNeeded()
         let fittedHeight = view.fittingSize.height
         let clampedHeight = min(max(fittedHeight, 320), 700)
-        popover.contentSize = NSSize(width: 320, height: clampedHeight)
+        popover.contentSize = NSSize(width: 420, height: clampedHeight)
     }
 }
 

@@ -65,6 +65,19 @@ struct PacingInfo {
         return remainingBudget / Double(days)
     }
 
+    var isOverBudget: Bool {
+        predictedTotal > maxBudget * 1.02
+    }
+
+    /// Estimated date when budget will be exhausted if current pace continues
+    var projectedBudgetExhaustDate: Date? {
+        guard isOverBudget, daysPassed > 0 else { return nil }
+        let dailyRate = spend / Double(daysPassed)
+        guard dailyRate > 0 else { return nil }
+        let daysUntilExhausted = max(0, maxBudget - spend) / dailyRate
+        return Calendar.current.date(byAdding: .day, value: max(0, Int(ceil(daysUntilExhausted))), to: Date())
+    }
+
     /// Deterministic pacing status based on projected total vs budget
     var status: PacingStatus {
         guard maxBudget > 0 else { return .unknown }

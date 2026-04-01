@@ -88,15 +88,28 @@ struct BudgetCard: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            // Hero: remaining amount
+            // Hero: remaining amount + percentage + reset
             VStack(spacing: 3) {
                 Text("Remaining")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let max = info.maxBudget {
-                    Text(String(format: "$%.2f", Swift.max(max - info.spend, 0)))
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(statusColor)
+                    let remaining = Swift.max(max - info.spend, 0)
+                    let percentage = max > 0 ? (remaining / max) * 100 : 0
+                    HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        Text(String(format: "$%.2f", remaining))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(statusColor)
+                        Text(String(format: "%.0f%%", percentage))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(statusColor.opacity(0.75))
+                    }
+                    if let resetAt = info.budgetResetAt {
+                        let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
+                        Text("Resets in \(Swift.max(0, days))d")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Text("—")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -108,18 +121,6 @@ struct BudgetCard: View {
             // Unified budget bar
             if let p = pacing {
                 BudgetBar(pacing: p, statusColor: statusColor)
-            }
-
-            // Bottom metrics
-            HStack {
-                if let resetAt = info.budgetResetAt {
-                    let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
-                    SupportingMetric(label: "Resets in", value: "\(Swift.max(0, days))d")
-                }
-                if let p = pacing {
-                    Spacer()
-                    SupportingMetric(label: "Safe", value: String(format: "$%.2f/day", p.safeDailySpend))
-                }
             }
 
             // Status badge
@@ -146,11 +147,7 @@ struct BudgetBar: View {
     let statusColor: Color
 
     private var scale: Double {
-        max(pacing.maxBudget, pacing.predictedTotal) * 1.06
-    }
-
-    private var isOverBudget: Bool {
-        pacing.predictedTotal > pacing.maxBudget * 1.02
+        pacing.maxBudget * 1.06
     }
 
     var body: some View {
@@ -177,18 +174,6 @@ struct BudgetBar: View {
                     Path(roundedRect: CGRect(x: 0, y: barY, width: spendW, height: barH), cornerRadius: 5),
                     with: .color(statusColor)
                 )
-
-                // Red overflow zone (projected beyond max)
-                if isOverBudget {
-                    let maxX = xPos(pacing.maxBudget)
-                    let projX = xPos(pacing.predictedTotal)
-                    if projX > maxX {
-                        context.fill(
-                            Path(roundedRect: CGRect(x: maxX, y: barY, width: projX - maxX, height: barH), cornerRadius: 0),
-                            with: .color(.red.opacity(0.3))
-                        )
-                    }
-                }
 
                 // Max budget marker (solid vertical line)
                 let maxX = xPos(pacing.maxBudget)
@@ -217,10 +202,16 @@ struct BudgetBar: View {
                 Spacer()
                 legendItem(indicator: .dashed, label: String(format: "$%.2f optimum", pacing.expectedUse))
                 Spacer()
-                if isOverBudget {
+                if pacing.isOverBudget {
+                    if let exhaustDate = pacing.projectedBudgetExhaustDate {
+                        Text("full by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day())) · ")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.red)
+                    }
+                } else {
                     Text(String(format: "$%.2f proj · ", pacing.predictedTotal))
                         .font(.system(size: 9))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.secondary)
                 }
                 legendItem(indicator: .solid, label: String(format: "$%.2f max", pacing.maxBudget))
             }
@@ -287,8 +278,10 @@ struct StatusBadge: View {
         case .nearLimit:
             return String(format: "Near limit · projected $%.2f", pacing.predictedTotal)
         case .overPace:
-            let delta = pacing.predictedTotal - pacing.maxBudget
-            return String(format: "Projected $%.2f over budget", delta)
+            if let exhaustDate = pacing.projectedBudgetExhaustDate {
+                return "Budget exhausted by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day()))"
+            }
+            return "Over pace — budget will be exhausted"
         case .unknown:
             return "Status unavailable"
         }

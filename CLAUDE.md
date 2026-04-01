@@ -1,0 +1,1 @@
+IMPORTANT: Always read @AGENTS.md for instructions.

@@ -31,7 +31,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 320)
+        .frame(width: 420)
         .environment(viewModel)
     }
 
@@ -52,6 +52,19 @@ struct PopoverView: View {
             if viewModel.appState == .loading || viewModel.appState == .refreshing || isRefreshing {
                 ProgressView().scaleEffect(0.6)
             }
+            Button {
+                closePopover?()
+                NSApp.activate(ignoringOtherApps: true)
+                DispatchQueue.main.async { openSettings() }
+            } label: {
+                Label("Settings", systemImage: "gear")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -129,20 +142,6 @@ struct PopoverView: View {
                 .buttonStyle(.plain)
                 .font(.caption)
                 .disabled(isRefreshing)
-
-                Spacer()
-
-                Button {
-                    closePopover?()
-                    NSApp.activate(ignoringOtherApps: true)
-                    DispatchQueue.main.async {
-                        openSettings()
-                    }
-                } label: {
-                    Label("Settings", systemImage: "gear")
-                }
-                .buttonStyle(.plain)
-                .font(.caption)
             }
         }
         .padding(.horizontal, 14)
