@@ -2,92 +2,137 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(BudgetViewModel.self) private var viewModel
-    @State private var newSecret = ""
-    @State private var secretSaveState: SecretSaveState = .idle
+    @State private var proxyURL: String = ""
+    @State private var newAPIKey: String = ""
+    @State private var connectionStatus: ConnectionStatus = .idle
     @State private var autoStart = AutoStartService.isEnabled
     @State private var autoStartError: String?
     @State private var versionTapCount = 0
     @State private var devModeUnlocked = UserDefaults.standard.bool(forKey: "devMode.unlocked")
     @State private var showDevModeSheet = false
 
+    private let refreshOptions = [5, 15, 30, 60, 120]
+
     var body: some View {
         @Bindable var vm = viewModel
         Form {
-            connectionSection(vm: $vm)
+            connectionSection
             displaySection(vm: $vm)
-            systemSection
+            refreshSection(vm: $vm)
+            generalSection
             if devModeUnlocked {
-                devModeSection
+                advancedSection
             }
             versionFooter
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: devModeUnlocked ? 560 : 480)
+        .frame(width: 400, height: devModeUnlocked ? 600 : 520)
+        .onAppear {
+            proxyURL = viewModel.endpointURL
+        }
         .sheet(isPresented: $showDevModeSheet) {
             DevModeView()
                 .environment(viewModel)
         }
     }
 
-    @ViewBuilder
-    private func connectionSection(vm: Bindable<BudgetViewModel>) -> some View {
-        Section {
-            TextField("https://your-litellm-proxy.com", text: vm.endpointURL)
-                .textFieldStyle(.roundedBorder)
+    // MARK: - Connection Section
 
-            HStack(alignment: .firstTextBaseline) {
-                SecureField("Paste new API key (write-only)", text: $newSecret)
-                    .textFieldStyle(.roundedBorder)
-                Button("Save") { saveSecret() }
-                    .disabled(newSecret.isEmpty || secretSaveState == .saving)
+    private var connectionSection: some View {
+        Section {
+            TextField("https://your-litellm-proxy.com", text: $proxyURL)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: proxyURL) { _, _ in
+                    connectionStatus = .idle
+                }
+
+            if !proxyURL.isEmpty && !proxyURL.hasPrefix("http://") && !proxyURL.hasPrefix("https://") {
+                Text("Enter a valid Proxy URL.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
 
-            secretFeedback
+            SecureField("Paste API key", text: $newAPIKey)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: newAPIKey) { _, _ in
+                    connectionStatus = .idle
+                }
+
+            HStack(spacing: 8) {
+                Button("Test Connection") {
+                    performConnectionTest()
+                }
+                .disabled(isTesting || !isFormFilled)
+
+                Button("Save") {
+                    saveConnection()
+                }
+                .disabled(isTesting || !canSave)
+                .buttonStyle(.borderedProminent)
+
+                Spacer()
+            }
+
+            connectionStatusView
         } header: {
             Text("Connection")
         }
     }
 
     @ViewBuilder
-    private var secretFeedback: some View {
-        switch secretSaveState {
-        case .idle: EmptyView()
-        case .saving: ProgressView().scaleEffect(0.7)
-        case .saved:
-            Label("API key saved securely to Keychain", systemImage: "checkmark.circle.fill")
-                .font(.caption).foregroundStyle(.green)
-        case .error(let msg):
-            Label(msg, systemImage: "xmark.circle.fill")
-                .font(.caption).foregroundStyle(.red)
+    private var connectionStatusView: some View {
+        switch connectionStatus {
+        case .idle:
+            EmptyView()
+        case .testing:
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.7)
+                Text("Testing connection...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .result(let message, let success):
+            Label(message, systemImage: success ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(success ? .green : .red)
         }
     }
+
+    // MARK: - Display Section
 
     @ViewBuilder
     private func displaySection(vm: Bindable<BudgetViewModel>) -> some View {
         Section {
-            Picker("Menu Bar Label", selection: vm.displayMode) {
+            Picker("Menu Bar Display", selection: vm.displayMode) {
                 ForEach(MenuBarDisplayMode.allCases) { mode in
                     Text(mode.label).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
-
-            HStack {
-                Text("Refresh Every")
-                Spacer()
-                TextField("", value: vm.updateIntervalMinutes, format: .number)
-                    .frame(width: 55)
-                    .textFieldStyle(.roundedBorder)
-                    .multilineTextAlignment(.trailing)
-                Text("minutes")
-                    .foregroundStyle(.secondary)
-            }
         } header: {
             Text("Display")
         }
     }
 
-    private var systemSection: some View {
+    // MARK: - Refresh Section
+
+    @ViewBuilder
+    private func refreshSection(vm: Bindable<BudgetViewModel>) -> some View {
+        Section {
+            Picker("Auto-refresh interval", selection: vm.updateIntervalMinutes) {
+                ForEach(refreshOptions, id: \.self) { minutes in
+                    Text("\(minutes) minutes").tag(minutes)
+                }
+            }
+            .pickerStyle(.menu)
+        } header: {
+            Text("Refresh")
+        }
+    }
+
+    // MARK: - General Section
+
+    private var generalSection: some View {
         Section {
             Toggle("Launch at Login", isOn: $autoStart)
                 .onChange(of: autoStart) { _, enabled in
@@ -103,18 +148,18 @@ struct SettingsView: View {
                 Text(err).font(.caption).foregroundStyle(.red)
             }
         } header: {
-            Text("System")
+            Text("General")
         }
     }
 
-    private var devModeSection: some View {
+    // MARK: - Advanced Section
+
+    private var advancedSection: some View {
         Section {
             Button {
                 showDevModeSheet = true
             } label: {
                 HStack {
-                    Image(systemName: "hammer.fill")
-                        .foregroundStyle(.orange)
                     Text("Developer Mode")
                     Spacer()
                     if viewModel.devMode.isEnabled {
@@ -134,6 +179,8 @@ struct SettingsView: View {
             Text("Advanced")
         }
     }
+
+    // MARK: - Version Footer
 
     private var versionFooter: some View {
         Section {
@@ -157,22 +204,61 @@ struct SettingsView: View {
         }
     }
 
-    private func saveSecret() {
-        secretSaveState = .saving
+    // MARK: - Helpers
+
+    private var isFormFilled: Bool {
+        !proxyURL.isEmpty && !newAPIKey.isEmpty
+    }
+
+    private var isProxyURLValid: Bool {
+        proxyURL.hasPrefix("http://") || proxyURL.hasPrefix("https://")
+    }
+
+    private var canSave: Bool {
+        !proxyURL.isEmpty && !newAPIKey.isEmpty && isProxyURLValid
+    }
+
+    private var isTesting: Bool {
+        if case .testing = connectionStatus { return true }
+        return false
+    }
+
+    private func performConnectionTest() {
+        guard isProxyURLValid else {
+            connectionStatus = .result("Invalid URL", false)
+            return
+        }
+        connectionStatus = .testing
+        Task {
+            let result = await viewModel.testConnection(url: proxyURL, apiKey: newAPIKey)
+            connectionStatus = .result(result.message, result.isSuccess)
+        }
+    }
+
+    private func saveConnection() {
+        guard !proxyURL.isEmpty, !newAPIKey.isEmpty, isProxyURLValid else { return }
+        viewModel.endpointURL = proxyURL
         do {
-            try KeychainService.save(newSecret)
-            newSecret = ""
-            secretSaveState = .saved
+            try KeychainService.save(newAPIKey)
+            newAPIKey = ""
+            connectionStatus = .result("Settings saved", true)
             Task {
                 try? await Task.sleep(for: .seconds(3))
-                secretSaveState = .idle
+                if case .result("Settings saved", _) = connectionStatus {
+                    connectionStatus = .idle
+                }
+                await viewModel.refresh()
             }
         } catch {
-            secretSaveState = .error(error.localizedDescription)
+            connectionStatus = .result(error.localizedDescription, false)
         }
     }
 }
 
-private enum SecretSaveState: Equatable {
-    case idle, saving, saved, error(String)
+// MARK: - Supporting Types
+
+private enum ConnectionStatus {
+    case idle
+    case testing
+    case result(String, Bool)
 }

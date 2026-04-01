@@ -3,6 +3,44 @@ import Foundation
 import Observation
 import SwiftUI
 
+// MARK: - App Load State
+
+enum AppLoadState: Equatable {
+    case notConfigured
+    case loading
+    case refreshing
+    case loaded
+    case authError
+    case networkError
+    case invalidData
+    case noBudget
+    case unknownError
+}
+
+// MARK: - Connection Test Result
+
+enum ConnectionTestResult {
+    case connected
+    case invalidURL
+    case authFailed
+    case serverUnreachable
+    case testFailed
+
+    var message: String {
+        switch self {
+        case .connected: return "Connected"
+        case .invalidURL: return "Invalid URL"
+        case .authFailed: return "Authentication failed"
+        case .serverUnreachable: return "Server unreachable"
+        case .testFailed: return "Connection test failed"
+        }
+    }
+
+    var isSuccess: Bool { self == .connected }
+}
+
+// MARK: - ViewModel
+
 @Observable
 final class BudgetViewModel {
 
@@ -33,6 +71,7 @@ final class BudgetViewModel {
 
     var budgetInfo: BudgetInfo?
     var spendLogs: [SpendLog] = []
+    var appState: AppLoadState = .loading
     var isLoading = false
     var errorMessage: String?
     var lastUpdated: Date?
@@ -45,25 +84,90 @@ final class BudgetViewModel {
 
     // MARK: - Computed
 
+    var pacingStatus: PacingStatus {
+        switch appState {
+        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
+            return .unknown
+        default:
+            return pacingInfo?.status ?? .unknown
+        }
+    }
+
     var menuBarText: String {
         guard let info = budgetInfo else { return "$--" }
         switch displayMode {
         case .dollar:
-            return info.spend >= 10 ? String(format: "$%.0f", info.spend) : String(format: "$%.2f", info.spend)
+            return String(format: "$%.2f", info.spend)
         case .percentage:
             guard let max = info.maxBudget, max > 0 else { return "N/A" }
             return String(format: "%.0f%%", (info.spend / max) * 100)
-}
+        }
+    }
+
+    var menuBarTooltip: String {
+        switch appState {
+        case .notConfigured:
+            return "LiteBudget — Not configured\nOpen Settings to connect."
+        case .authError:
+            return "Authentication failed\nCheck your API key in Settings."
+        case .networkError:
+            return "Server unreachable\nCheck your Proxy URL and network."
+        case .invalidData:
+            return "Invalid response data\nCheck your LiteLLM proxy."
+        case .noBudget:
+            return "No budget found\nNo budget data is available."
+        case .unknownError:
+            return "Unknown error\nTry refreshing."
+        default:
+            break
+        }
+        guard let info = budgetInfo else {
+            return "Status: Unknown"
+        }
+        let spend = info.spend
+        let maxBudget = info.maxBudget ?? 0
+        let remaining = max(maxBudget - spend, 0)
+        let daysRemaining = pacingInfo?.daysRemaining ?? 0
+        let projected = pacingInfo?.predictedTotal ?? 0
+        return [
+            String(format: "Used: $%.2f of $%.2f", spend, maxBudget),
+            String(format: "Remaining: $%.2f", remaining),
+            "Reset in: \(daysRemaining) day\(daysRemaining == 1 ? "" : "s")",
+            "Status: \(pacingStatus.label)",
+            String(format: "Projected by reset: $%.2f", projected)
+        ].joined(separator: "\n")
     }
 
     var pacingBarColor: Color {
-        guard let pacing = pacingInfo else { return .accentColor }
-        return pacing.spend <= pacing.expectedUse ? .green : pacing.spend > pacing.expectedUse * 1.2 ? .red : .orange
+        switch appState {
+        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
+            return Color(nsColor: .systemGray)
+        default:
+            break
+        }
+        switch pacingStatus {
+        case .underPace: return .green
+        case .onTrack: return Color(nsColor: .systemGray)
+        case .nearLimit: return .yellow
+        case .overPace: return .red
+        case .unknown: return Color(nsColor: .systemGray)
+        }
     }
 
     var pacingBarNSColor: NSColor {
-        guard let pacing = pacingInfo else { return .controlAccentColor }
-        return pacing.spend <= pacing.expectedUse ? .systemGreen : pacing.spend > pacing.expectedUse * 1.2 ? .systemRed : .systemOrange
+        switch appState {
+        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
+            return .systemGray
+        default:
+            break
+        }
+        switch pacingStatus {
+        case .underPace: return .systemGreen
+        case .onTrack: return .systemGray
+        case .nearLimit: return .systemYellow
+        case .overPace: return .systemRed
+        case .unknown: return .systemGray
+        }
     }
 
     var budgetPercentage: Double {
@@ -78,6 +182,21 @@ final class BudgetViewModel {
         return grouped
             .map { (date: $0.key, amount: $0.value.reduce(0) { $0 + $1.spend }) }
             .sorted { $0.date < $1.date }
+    }
+
+    var relativeLastUpdated: String {
+        guard let last = lastUpdated else { return "" }
+        let elapsed = Int(-last.timeIntervalSinceNow)
+        if elapsed < 60 { return "just now" }
+        if elapsed < 3600 { return "\(elapsed / 60) min ago" }
+        return "\(elapsed / 3600) hr ago"
+    }
+
+    var nextRefreshMinutes: Int? {
+        guard let next = nextRefresh else { return nil }
+        let seconds = Int(next.timeIntervalSinceNow)
+        if seconds <= 0 { return nil }
+        return max(1, seconds / 60)
     }
 
     // MARK: - Private
@@ -95,29 +214,79 @@ final class BudgetViewModel {
     @MainActor
     func refresh() async {
         if devMode.isEnabled {
+            appState = budgetInfo == nil ? .loading : .refreshing
+            isLoading = true
             injectDevData()
+            isLoading = false
+            appState = .loaded
             return
         }
         guard !endpointURL.isEmpty else {
-            errorMessage = "Configure the LiteLLM endpoint URL in Settings."
+            appState = .notConfigured
+            isLoading = false
             return
         }
-        guard let apiKey = try? KeychainService.load() else {
-            errorMessage = "Configure the LiteLLM API key in Settings."
+        guard let apiKey = try? KeychainService.load(), !apiKey.isEmpty else {
+            appState = .notConfigured
+            isLoading = false
             return
         }
+        appState = budgetInfo == nil ? .loading : .refreshing
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
             let info = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            guard info.maxBudget != nil else {
+                budgetInfo = info
+                appState = .noBudget
+                return
+            }
             budgetInfo = info
             await fetchLogs(apiKey: apiKey, info: info)
             computePacing(from: info)
             lastUpdated = Date()
-        } catch {
+            appState = .loaded
+            errorMessage = nil
+        } catch let error as APIError {
+            switch error {
+            case .httpError(let code) where code == 401 || code == 403:
+                appState = .authError
+            case .httpError:
+                appState = .networkError
+            case .invalidURL:
+                appState = .networkError
+            }
             errorMessage = error.localizedDescription
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain {
+                appState = .networkError
+            } else {
+                appState = .unknownError
+            }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    func testConnection(url: String, apiKey: String) async -> ConnectionTestResult {
+        guard !url.isEmpty, !apiKey.isEmpty else { return .invalidURL }
+        guard url.hasPrefix("http://") || url.hasPrefix("https://") else { return .invalidURL }
+        do {
+            _ = try await api.fetchBudgetInfo(baseURL: url, apiKey: apiKey)
+            return .connected
+        } catch let error as APIError {
+            switch error {
+            case .invalidURL: return .invalidURL
+            case .httpError(let code) where code == 401 || code == 403: return .authFailed
+            case .httpError: return .serverUnreachable
+            }
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain { return .serverUnreachable }
+            return .testFailed
         }
     }
 

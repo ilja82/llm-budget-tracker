@@ -8,8 +8,8 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .dollar: return "$"
-        case .percentage: return "%"
+        case .dollar: return "Amount"
+        case .percentage: return "Percent"
         }
     }
 }

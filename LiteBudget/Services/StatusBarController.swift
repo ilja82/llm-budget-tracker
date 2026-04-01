@@ -57,6 +57,7 @@ final class StatusBarController {
         img.isTemplate = false
         button.image = img
         button.imageScaling = .scaleProportionallyDown
+        button.toolTip = viewModel.menuBarTooltip
     }
 
     private func observeViewModel() {
@@ -64,6 +65,8 @@ final class StatusBarController {
             _ = viewModel.budgetPercentage
             _ = viewModel.menuBarText
             _ = viewModel.pacingBarNSColor
+            _ = viewModel.menuBarTooltip
+            _ = viewModel.appState
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.updateImage()
