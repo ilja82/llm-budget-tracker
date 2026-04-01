@@ -1,0 +1,178 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+
+env:
+  SCHEME: LiteBudget
+  CONFIGURATION: Release
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build job – runs on every PR and on version tags
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build macOS App
+    runs-on: macos-14        # Apple Silicon runner with Xcode 15+
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (unsigned)
+        run: |
+          xcodebuild \
+            -project LiteBudget.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination "platform=macOS" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SYMROOT="${{ runner.temp }}/build" \
+            build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiteBudget-unsigned
+          path: ${{ runner.temp }}/build/Release/LiteBudget.app
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Release job – only on version tags; signs, packages DMG, creates GitHub release
+  # ─────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Package & Release
+    runs-on: macos-14
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install XcodeGen & create-dmg
+        run: brew install xcodegen create-dmg
+
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD: ci-keychain-password
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/ci.keychain-db"
+          echo "$CERTIFICATE_BASE64" | base64 --decode -o "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project LiteBudget.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination "platform=macOS" \
+            -archivePath "$RUNNER_TEMP/LiteBudget.xcarchive"
+
+      - name: Export (Developer ID)
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>developer-id</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/LiteBudget.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+
+      - name: Notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent \
+            "$RUNNER_TEMP/export/LiteBudget.app" \
+            "$RUNNER_TEMP/LiteBudget.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/LiteBudget.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$RUNNER_TEMP/export/LiteBudget.app"
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "LiteBudget" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "LiteBudget.app" 175 190 \
+            --hide-extension "LiteBudget.app" \
+            --app-drop-link 425 190 \
+            "$RUNNER_TEMP/LiteBudget.dmg" \
+            "$RUNNER_TEMP/export/"
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          SHA=$(shasum -a 256 "$RUNNER_TEMP/LiteBudget.dmg" | awk '{print $1}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/LiteBudget.dmg
+          generate_release_notes: true
+
+      - name: Update Homebrew Cask SHA
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i '' \
+            "s|sha256 \".*\"|sha256 \"${{ steps.sha.outputs.sha256 }}\"|" \
+            Casks/lite-budget.rb
+          sed -i '' \
+            "s|version \".*\"|version \"$VERSION\"|" \
+            Casks/lite-budget.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/lite-budget.rb
+          git commit -m "chore: bump cask to $GITHUB_REF_NAME" || true
+          git push origin HEAD:main || true
