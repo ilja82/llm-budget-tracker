@@ -242,7 +242,7 @@ final class BudgetViewModel {
 
     let devMode = DevModeSettings()
     private let api = APIService()
-    nonisolated(unsafe) private var timerTask: Task<Void, Never>?
+    @ObservationIgnored nonisolated(unsafe) private var timerTask: Task<Void, Never>?
 
     init() { startTimer() }
 

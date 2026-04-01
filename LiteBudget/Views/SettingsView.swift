@@ -26,7 +26,7 @@ struct SettingsView: View {
             versionFooter
         }
         .formStyle(.grouped)
-        .frame(minWidth: 400, idealWidth: 400, maxWidth: 400)
+        .frame(minWidth: 500, idealWidth: 500, maxWidth: 500)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             proxyURL = viewModel.endpointURL
