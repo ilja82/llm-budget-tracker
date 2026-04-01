@@ -23,7 +23,10 @@ struct PopoverView: View {
                             PacingView(pacing: pacing)
                         }
                         if !viewModel.dailySpend.isEmpty {
-                            UsageChartView(data: viewModel.dailySpend)
+                            UsageChartView(
+                                data: viewModel.dailySpend,
+                                safeDailySpend: viewModel.pacingInfo?.safeDailySpend
+                            )
                         }
                     }
                     .padding(14)
