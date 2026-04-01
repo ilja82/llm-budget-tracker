@@ -272,7 +272,7 @@ struct StatusBadge: View {
         switch pacing.status {
         case .underPace:
             let delta = pacing.expectedUse - pacing.spend
-            return String(format: "$%.2f under optimum · projected $%.2f", delta, pacing.predictedTotal)
+            return String(format: "$%.2f below optimum · projected $%.2f", delta, pacing.predictedTotal)
         case .onTrack:
             return String(format: "On track · projected $%.2f", pacing.predictedTotal)
         case .nearLimit:

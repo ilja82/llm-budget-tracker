@@ -42,6 +42,7 @@ enum ConnectionTestResult {
 // MARK: - ViewModel
 
 @Observable
+@MainActor
 final class BudgetViewModel {
 
     // MARK: - Persisted Settings
@@ -241,7 +242,7 @@ final class BudgetViewModel {
 
     let devMode = DevModeSettings()
     private let api = APIService()
-    private var timerTask: Task<Void, Never>?
+    nonisolated(unsafe) private var timerTask: Task<Void, Never>?
 
     init() { startTimer() }
 
