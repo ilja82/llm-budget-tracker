@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PopoverView: View {
+    var closePopover: (() -> Void)? = nil
     @Environment(BudgetViewModel.self) private var viewModel
     @Environment(\.openSettings) private var openSettings
 
@@ -79,8 +80,11 @@ struct PopoverView: View {
                 Spacer()
 
                 Button {
+                    closePopover?()
                     NSApp.activate(ignoringOtherApps: true)
-                    openSettings()
+                    DispatchQueue.main.async {
+                        openSettings()
+                    }
                 } label: {
                     Label("Settings", systemImage: "gear")
                 }

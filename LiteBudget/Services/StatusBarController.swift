@@ -20,7 +20,9 @@ final class StatusBarController {
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = NSHostingController(
-            rootView: PopoverView().environment(viewModel)
+            rootView: PopoverView(closePopover: { [weak self] in
+                self?.popover.performClose(nil)
+            }).environment(viewModel)
         )
     }
 
