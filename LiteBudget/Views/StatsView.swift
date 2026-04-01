@@ -44,13 +44,7 @@ struct StatsView: View {
             )
         case .loaded, .refreshing:
             if let info = viewModel.budgetInfo {
-                VStack(spacing: 8) {
-                    BudgetHeroCard(
-                        info: info,
-                        pacing: viewModel.pacingInfo,
-                        budgetPercentage: viewModel.budgetPercentage
-                    )
-                }
+                BudgetCard(info: info, pacing: viewModel.pacingInfo)
             }
         }
     }
@@ -72,32 +66,37 @@ struct StatsView: View {
     }
 }
 
-// MARK: - Budget Hero Card
+// MARK: - Budget Card
 
-struct BudgetHeroCard: View {
+struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
-    let budgetPercentage: Double
 
-    private var heroColor: Color {
-        budgetPercentage > 0.9 ? .red : budgetPercentage > 0.75 ? .orange : .green
-    }
-
-    private var progressTint: Color {
-        budgetPercentage > 0.9 ? .red : budgetPercentage > 0.75 ? .orange : Color.accentColor
+    private var statusColor: Color {
+        guard let p = pacing else {
+            let pct = info.maxBudget.map { info.spend / $0 } ?? 0
+            return pct > 0.9 ? .red : pct > 0.75 ? .orange : .green
+        }
+        switch p.status {
+        case .underPace: return .green
+        case .onTrack: return Color.accentColor
+        case .nearLimit: return .orange
+        case .overPace: return .red
+        case .unknown: return .secondary
+        }
     }
 
     var body: some View {
         VStack(spacing: 10) {
-            // Hero stat
+            // Hero: remaining amount
             VStack(spacing: 3) {
-                Text("Remaining Budget")
+                Text("Remaining")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let max = info.maxBudget {
                     Text(String(format: "$%.2f", Swift.max(max - info.spend, 0)))
                         .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(heroColor)
+                        .foregroundStyle(statusColor)
                 } else {
                     Text("—")
                         .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -106,47 +105,193 @@ struct BudgetHeroCard: View {
             }
             .frame(maxWidth: .infinity)
 
-            // Progress bar
-            if info.maxBudget != nil {
-                ProgressView(value: min(budgetPercentage, 1.0))
-                    .tint(progressTint)
-                    .scaleEffect(x: 1, y: 1.4, anchor: .center)
+            // Unified budget bar
+            if let p = pacing {
+                BudgetBar(pacing: p, statusColor: statusColor)
             }
 
-            // Supporting metrics
+            // Bottom metrics
             HStack {
-                if let max = info.maxBudget {
-                    SupportingMetric(
-                        label: "Used",
-                        value: String(format: "$%.2f / $%.2f", info.spend, max)
-                    )
-                    Spacer()
-                }
-                if let pacing {
-                    SupportingMetric(
-                        label: "% used",
-                        value: String(format: "%.0f%%", pacing.percentageUsed * 100)
-                    )
-                    Spacer()
-                }
                 if let resetAt = info.budgetResetAt {
                     let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
-                    SupportingMetric(
-                        label: "Resets in",
-                        value: "\(Swift.max(0, days)) day\(days == 1 ? "" : "s")"
-                    )
+                    SupportingMetric(label: "Resets in", value: "\(Swift.max(0, days))d")
                 }
+                if let p = pacing {
+                    Spacer()
+                    SupportingMetric(label: "Safe", value: String(format: "$%.2f/day", p.safeDailySpend))
+                }
+            }
+
+            // Status badge
+            if let p = pacing {
+                StatusBadge(pacing: p, color: statusColor)
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(heroColor.opacity(0.07))
+                .fill(statusColor.opacity(0.07))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(heroColor.opacity(0.18), lineWidth: 1)
+                        .strokeBorder(statusColor.opacity(0.18), lineWidth: 1)
                 )
         )
+    }
+}
+
+// MARK: - Budget Bar
+
+struct BudgetBar: View {
+    let pacing: PacingInfo
+    let statusColor: Color
+
+    private var scale: Double {
+        max(pacing.maxBudget, pacing.predictedTotal) * 1.06
+    }
+
+    private var isOverBudget: Bool {
+        pacing.predictedTotal > pacing.maxBudget * 1.02
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Canvas { context, size in
+                let w = size.width
+                let barH: CGFloat = 12
+                let barY: CGFloat = (size.height - barH) / 2
+
+                func xPos(_ value: Double) -> CGFloat {
+                    guard scale > 0 else { return 0 }
+                    return CGFloat(min(value / scale, 1.0)) * w
+                }
+
+                // Track
+                context.fill(
+                    Path(roundedRect: CGRect(x: 0, y: barY, width: w, height: barH), cornerRadius: 5),
+                    with: .color(.secondary.opacity(0.15))
+                )
+
+                // Spent fill
+                let spendW = max(6, xPos(pacing.spend))
+                context.fill(
+                    Path(roundedRect: CGRect(x: 0, y: barY, width: spendW, height: barH), cornerRadius: 5),
+                    with: .color(statusColor)
+                )
+
+                // Red overflow zone (projected beyond max)
+                if isOverBudget {
+                    let maxX = xPos(pacing.maxBudget)
+                    let projX = xPos(pacing.predictedTotal)
+                    if projX > maxX {
+                        context.fill(
+                            Path(roundedRect: CGRect(x: maxX, y: barY, width: projX - maxX, height: barH), cornerRadius: 0),
+                            with: .color(.red.opacity(0.3))
+                        )
+                    }
+                }
+
+                // Max budget marker (solid vertical line)
+                let maxX = xPos(pacing.maxBudget)
+                var maxPath = Path()
+                maxPath.move(to: CGPoint(x: maxX, y: barY - 4))
+                maxPath.addLine(to: CGPoint(x: maxX, y: barY + barH + 4))
+                context.stroke(maxPath, with: .color(.primary.opacity(0.55)), lineWidth: 2)
+
+                // Optimum marker (dashed vertical line)
+                let optX = xPos(pacing.expectedUse)
+                var dashY = barY - 4
+                let dashEnd = barY + barH + 4
+                while dashY < dashEnd {
+                    var dp = Path()
+                    dp.move(to: CGPoint(x: optX, y: dashY))
+                    dp.addLine(to: CGPoint(x: optX, y: min(dashY + 3, dashEnd)))
+                    context.stroke(dp, with: .color(.primary.opacity(0.4)), lineWidth: 1.5)
+                    dashY += 5
+                }
+            }
+            .frame(height: 20)
+
+            // Legend
+            HStack(spacing: 0) {
+                legendItem(indicator: .dot(statusColor), label: String(format: "$%.2f spent", pacing.spend))
+                Spacer()
+                legendItem(indicator: .dashed, label: String(format: "$%.2f optimum", pacing.expectedUse))
+                Spacer()
+                if isOverBudget {
+                    Text(String(format: "$%.2f proj · ", pacing.predictedTotal))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.red)
+                }
+                legendItem(indicator: .solid, label: String(format: "$%.2f max", pacing.maxBudget))
+            }
+        }
+    }
+
+    private enum Indicator {
+        case dot(Color), dashed, solid
+    }
+
+    @ViewBuilder
+    private func legendItem(indicator: Indicator, label: String) -> some View {
+        HStack(spacing: 4) {
+            switch indicator {
+            case .dot(let color):
+                Circle().fill(color).frame(width: 6, height: 6)
+            case .dashed:
+                HStack(spacing: 1) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Rectangle()
+                            .fill(Color.primary.opacity(0.4))
+                            .frame(width: 3, height: 1.5)
+                    }
+                }
+            case .solid:
+                Rectangle()
+                    .fill(Color.primary.opacity(0.55))
+                    .frame(width: 2, height: 10)
+            }
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Status Badge
+
+struct StatusBadge: View {
+    let pacing: PacingInfo
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: pacing.status.icon)
+                .font(.caption.weight(.semibold))
+            Text(statusText)
+                .font(.caption)
+                .multilineTextAlignment(.leading)
+            Spacer()
+        }
+        .foregroundStyle(color)
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.1)))
+    }
+
+    private var statusText: String {
+        switch pacing.status {
+        case .underPace:
+            let delta = pacing.expectedUse - pacing.spend
+            return String(format: "$%.2f under optimum · projected $%.2f", delta, pacing.predictedTotal)
+        case .onTrack:
+            return String(format: "On track · projected $%.2f", pacing.predictedTotal)
+        case .nearLimit:
+            return String(format: "Near limit · projected $%.2f", pacing.predictedTotal)
+        case .overPace:
+            let delta = pacing.predictedTotal - pacing.maxBudget
+            return String(format: "Projected $%.2f over budget", delta)
+        case .unknown:
+            return "Status unavailable"
+        }
     }
 }
 

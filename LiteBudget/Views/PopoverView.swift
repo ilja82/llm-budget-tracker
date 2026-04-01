@@ -18,10 +18,6 @@ struct PopoverView: View {
                 ScrollView {
                     VStack(spacing: 10) {
                         StatsView()
-                        if let pacing = viewModel.pacingInfo,
-                           viewModel.appState == .loaded || viewModel.appState == .refreshing {
-                            PacingView(pacing: pacing)
-                        }
                         if !viewModel.dailySpend.isEmpty {
                             UsageChartView(
                                 data: viewModel.dailySpend,

@@ -15,7 +15,7 @@ struct UsageChartView: View {
                 }
             }
         } label: {
-            Label("Daily Spend", systemImage: "chart.bar.fill")
+            Label("Daily Spending", systemImage: "chart.bar.fill")
                 .font(.caption.weight(.semibold))
         }
     }
@@ -57,10 +57,14 @@ struct UsageChartView: View {
 
     private func safeSpendCallout(_ safe: Double) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Daily spend")
-                .font(.system(size: 9))
-                .foregroundStyle(.green.opacity(0.85))
-            Text(String(format: "Up to $%.2f/day", safe))
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 9))
+                Text("Safe daily limit")
+                    .font(.system(size: 9))
+            }
+            .foregroundStyle(.green.opacity(0.85))
+            Text(String(format: "$%.2f/day", safe))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.green)
             Text("Stay at or under this amount per day to finish within budget.")
