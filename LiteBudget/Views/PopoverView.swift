@@ -7,6 +7,7 @@ struct PopoverView: View {
 
     @State private var isRefreshing = false
     @State private var refreshError: String?
+    @State private var autoStartEnabled = AutoStartService.isEnabled
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +34,9 @@ struct PopoverView: View {
         }
         .frame(width: 420)
         .environment(viewModel)
+        .onReceive(NotificationCenter.default.publisher(for: NSPopover.willShowNotification)) { _ in
+            autoStartEnabled = AutoStartService.isEnabled
+        }
     }
 
     private var header: some View {
@@ -124,6 +128,12 @@ struct PopoverView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             }
+            if !autoStartEnabled {
+                Text("Tip: Enable \"Launch at Login\" in Settings.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             HStack {
                 Button {
                     guard !isRefreshing else { return }
@@ -142,6 +152,7 @@ struct PopoverView: View {
                 .buttonStyle(.plain)
                 .font(.caption)
                 .disabled(isRefreshing)
+
             }
         }
         .padding(.horizontal, 14)
