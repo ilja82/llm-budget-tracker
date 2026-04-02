@@ -1,6 +1,6 @@
 import Foundation
 
-/// A single spend log entry from GET /spend/logs/v2
+/// A single spend log entry (used internally; sourced from /user/daily/activity)
 struct SpendLog: Codable, Identifiable {
     let requestId: String
     let spend: Double
@@ -43,4 +43,54 @@ struct SpendLog: Codable, Identifiable {
 /// Wrapper for paginated response
 struct SpendLogsResponse: Codable {
     let data: [SpendLog]
+}
+
+// MARK: - /user/daily/activity models
+
+struct SpendMetrics: Codable {
+    let spend: Double
+    let promptTokens: Int
+    let completionTokens: Int
+    let totalTokens: Int
+    let apiRequests: Int
+
+    enum CodingKeys: String, CodingKey {
+        case spend
+        case promptTokens = "prompt_tokens"
+        case completionTokens = "completion_tokens"
+        case totalTokens = "total_tokens"
+        case apiRequests = "api_requests"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        spend            = (try? c.decode(Double.self, forKey: .spend)) ?? 0
+        promptTokens     = (try? c.decode(Int.self, forKey: .promptTokens)) ?? 0
+        completionTokens = (try? c.decode(Int.self, forKey: .completionTokens)) ?? 0
+        totalTokens      = (try? c.decode(Int.self, forKey: .totalTokens)) ?? 0
+        apiRequests      = (try? c.decode(Int.self, forKey: .apiRequests)) ?? 0
+    }
+}
+
+struct DailySpendData: Codable {
+    let date: String       // "yyyy-MM-dd"
+    let metrics: SpendMetrics
+
+    /// Convert to SpendLog so downstream consumers (charts, pacing) are unchanged.
+    func toSpendLog() -> SpendLog? {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "UTC")
+        guard let parsedDate = fmt.date(from: date) else { return nil }
+        return SpendLog(
+            spend: metrics.spend,
+            startTime: parsedDate,
+            promptTokens: metrics.promptTokens,
+            completionTokens: metrics.completionTokens
+        )
+    }
+}
+
+struct DailyActivityResponse: Codable {
+    let results: [DailySpendData]
 }

@@ -26,21 +26,24 @@ actor APIService {
         return (try decoder.decode(BudgetInfo.self, from: data), rawJSON, statusCode)
     }
 
-    func fetchSpendLogs(
+    func fetchDailyActivity(
         baseURL: String,
         apiKey: String,
+        userId: String,
         startDate: Date,
-        page: Int = 1
+        endDate: Date
     ) async throws -> ([SpendLog], String, Int?) {
-        guard var components = URLComponents(string: baseURL + "/spend/logs") else {
+        guard var components = URLComponents(string: baseURL + "/user/daily/activity") else {
             throw APIError.invalidURL
         }
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         components.queryItems = [
-            URLQueryItem(name: "api_key", value: apiKey),
+            URLQueryItem(name: "user_id", value: userId),
             URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),
-            URLQueryItem(name: "summarize", value: "false")
+            URLQueryItem(name: "end_date", value: fmt.string(from: endDate)),
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "page_size", value: "32")
         ]
         guard let url = components.url else { throw APIError.invalidURL }
         let request = authenticatedRequest(url: url, apiKey: apiKey)
@@ -48,8 +51,9 @@ actor APIService {
         let statusCode = (response as? HTTPURLResponse)?.statusCode
         try validate(response)
         let rawJSON = String(data: data, encoding: .utf8) ?? ""
-        if let logs = try? decoder.decode([SpendLog].self, from: data) { return (logs, rawJSON, statusCode) }
-        return (try decoder.decode(SpendLogsResponse.self, from: data).data, rawJSON, statusCode)
+        let daily = try decoder.decode(DailyActivityResponse.self, from: data)
+        let logs = daily.results.compactMap { $0.toSpendLog() }
+        return (logs, rawJSON, statusCode)
     }
 
     // MARK: - Helpers

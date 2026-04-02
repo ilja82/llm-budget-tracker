@@ -427,25 +427,34 @@ final class BudgetViewModel {
             return
         }
         let startDate = Calendar.current.date(byAdding: .day, value: -days, to: resetAt) ?? Date()
+        let endDate = Date()
         let urlStr = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
-        let spendQueryParams = ["start_date": fmt.string(from: startDate), "summarize": "false"]
+        let queryParams: [String: String] = [
+            "user_id": info.userId,
+            "start_date": fmt.string(from: startDate),
+            "end_date": fmt.string(from: endDate),
+            "page": "1",
+            "page_size": "32"
+        ]
         do {
-            let (logs, rawJSON, statusCode) = try await api.fetchSpendLogs(
+            let (logs, rawJSON, statusCode) = try await api.fetchDailyActivity(
                 baseURL: endpointURL,
                 apiKey: apiKey,
-                startDate: startDate
+                userId: info.userId,
+                startDate: startDate,
+                endDate: endDate
             )
             spendLogs = logs
             requestLogger.add(APIRequestLog(
                 id: UUID(),
                 timestamp: Date(),
-                endpoint: "/spend/logs",
-                requestURL: urlStr + "/spend/logs",
+                endpoint: "/user/daily/activity",
+                requestURL: urlStr + "/user/daily/activity",
                 requestMethod: "GET",
                 requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: spendQueryParams,
+                requestQueryParams: queryParams,
                 statusCode: statusCode,
                 responseBody: rawJSON,
                 errorMessage: nil,
@@ -455,11 +464,11 @@ final class BudgetViewModel {
             requestLogger.add(APIRequestLog(
                 id: UUID(),
                 timestamp: Date(),
-                endpoint: "/spend/logs",
-                requestURL: urlStr + "/spend/logs",
+                endpoint: "/user/daily/activity",
+                requestURL: urlStr + "/user/daily/activity",
                 requestMethod: "GET",
                 requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: spendQueryParams,
+                requestQueryParams: queryParams,
                 statusCode: (error as? APIError).flatMap { if case .httpError(let c) = $0 { return c } else { return nil } },
                 responseBody: "",
                 errorMessage: error.localizedDescription,
