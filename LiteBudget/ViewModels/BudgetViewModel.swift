@@ -68,6 +68,13 @@ final class BudgetViewModel {
         didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: "displayMode") }
     }
 
+    var chartDays: Int = {
+        let stored = UserDefaults.standard.integer(forKey: "chartDays")
+        return stored > 0 ? stored : 14
+    }() {
+        didSet { UserDefaults.standard.set(chartDays, forKey: "chartDays") }
+    }
+
     // MARK: - State
 
     var budgetInfo: BudgetInfo?
@@ -424,13 +431,11 @@ final class BudgetViewModel {
     // MARK: - Helpers
 
     private func fetchLogs(apiKey: String, info: BudgetInfo) async {
-        guard let resetAt = info.budgetResetAt,
-              let duration = info.budgetDuration,
-              let days = parseDurationDays(duration) else {
+        guard info.budgetResetAt != nil else {
             spendLogs = []
             return
         }
-        let startDate = Calendar.current.date(byAdding: .day, value: -days, to: resetAt) ?? Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
         let endDate = Date()
         let urlStr = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
         let fmt = DateFormatter()
