@@ -194,9 +194,6 @@ jobs:
           codesign --verify --deep --strict --verbose=2 \
             "${RUNNER_TEMP}/export/${APP_NAME}.app"
 
-          spctl -a -t exec -vv \
-            "${RUNNER_TEMP}/export/${APP_NAME}.app"
-
       - name: Store notarization credentials
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -244,6 +241,9 @@ jobs:
 
           xcrun stapler staple "${RUNNER_TEMP}/${APP_NAME}.dmg"
           xcrun stapler validate "${RUNNER_TEMP}/${APP_NAME}.dmg"
+
+          spctl -a -t open --context context:primary-signature -vv \
+            "${RUNNER_TEMP}/${APP_NAME}.dmg"
 
       - name: Compute SHA256
         id: sha
