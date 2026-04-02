@@ -156,7 +156,7 @@ final class BudgetViewModel {
         }
         switch pacingStatus {
         case .underPace: return .green
-        case .onTrack: return Color(nsColor: .systemGray)
+        case .onTrack: return .green
         case .nearLimit: return .yellow
         case .overPace: return .red
         case .unknown: return Color(nsColor: .systemGray)
@@ -172,7 +172,7 @@ final class BudgetViewModel {
         }
         switch pacingStatus {
         case .underPace: return .systemGreen
-        case .onTrack: return .systemGray
+        case .onTrack: return .systemGreen
         case .nearLimit: return .systemYellow
         case .overPace: return .systemRed
         case .unknown: return .systemGray

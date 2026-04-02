@@ -12,7 +12,7 @@ enum PacingStatus {
     var label: String {
         switch self {
         case .underPace: return "Under pace"
-        case .onTrack: return "On track"
+        case .onTrack: return "On pace"
         case .nearLimit: return "Near limit"
         case .overPace: return "Over pace"
         case .unknown: return "Unknown"

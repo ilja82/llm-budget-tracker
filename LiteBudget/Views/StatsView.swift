@@ -79,7 +79,7 @@ struct BudgetCard: View {
         }
         switch p.status {
         case .underPace: return .green
-        case .onTrack: return Color.accentColor
+        case .onTrack: return .green
         case .nearLimit: return .orange
         case .overPace: return .red
         case .unknown: return .secondary
@@ -295,16 +295,32 @@ struct StatusBadge: View {
     private var statusText: String {
         switch pacing.status {
         case .underPace:
-            return String(format: "Low usage · projected this month: $%.2f", pacing.predictedTotal)
+            return String(
+                format: "Under pace · projected total: $%.2f, below your $%.2f budget",
+                pacing.predictedTotal,
+                pacing.maxBudget
+            )
         case .onTrack:
-            return String(format: "Optimal usage · projected this month: $%.2f", pacing.predictedTotal)
+            return String(
+                format: "On pace · projected total: $%.2f, within your $%.2f budget",
+                pacing.predictedTotal,
+                pacing.maxBudget
+            )
         case .nearLimit:
-            return String(format: "Near limit · projected this month: $%.2f", pacing.predictedTotal)
+            return String(
+                format: "Near limit · projected total: $%.2f, close to your $%.2f budget",
+                pacing.predictedTotal,
+                pacing.maxBudget
+            )
         case .overPace:
             if let exhaustDate = pacing.projectedBudgetExhaustDate {
-                return "Budget exhausted by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day()))"
+                return "Over pace · budget exhausted by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day()))"
             }
-            return "Over pace — budget will be exhausted"
+            return String(
+                format: "Over pace · projected total: $%.2f, above your $%.2f budget",
+                pacing.predictedTotal,
+                pacing.maxBudget
+            )
         case .unknown:
             return "Status unavailable"
         }
