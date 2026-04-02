@@ -26,6 +26,7 @@ permissions:
 jobs:
   build:
     name: Build macOS App (unsigned)
+    if: github.event_name == 'pull_request'
     runs-on: macos-26
 
     permissions:
@@ -85,7 +86,6 @@ jobs:
   release:
     name: Sign, Notarize & Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
     runs-on: macos-26
 
     environment:
@@ -136,8 +136,7 @@ jobs:
             -k "$KEYCHAIN_PATH" \
             -P "$CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
-            -T /usr/bin/security \
-            -T /usr/bin/productbuild
+            -T /usr/bin/security
 
           security list-keychains -d user -s "$KEYCHAIN_PATH"
           security default-keychain -d user -s "$KEYCHAIN_PATH"
@@ -188,6 +187,16 @@ jobs:
 
           test -d "${RUNNER_TEMP}/export/${APP_NAME}.app"
 
+      - name: Verify signed app
+        run: |
+          set -euo pipefail
+
+          codesign --verify --deep --strict --verbose=2 \
+            "${RUNNER_TEMP}/export/${APP_NAME}.app"
+
+          spctl -a -t exec -vv \
+            "${RUNNER_TEMP}/export/${APP_NAME}.app"
+
       - name: Store notarization credentials
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -200,21 +209,6 @@ jobs:
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID"
-
-      - name: Notarize app
-        run: |
-          set -euo pipefail
-
-          ditto -c -k --keepParent \
-            "${RUNNER_TEMP}/export/${APP_NAME}.app" \
-            "${RUNNER_TEMP}/${APP_NAME}.zip"
-
-          xcrun notarytool submit "${RUNNER_TEMP}/${APP_NAME}.zip" \
-            --keychain-profile "ci-notarytool-profile" \
-            --wait
-
-          xcrun stapler staple "${RUNNER_TEMP}/export/${APP_NAME}.app"
-          xcrun stapler validate "${RUNNER_TEMP}/export/${APP_NAME}.app"
 
       - name: Create DMG
         run: |
@@ -235,6 +229,21 @@ jobs:
             "${RUNNER_TEMP}/dmg-root/"
 
           test -f "${RUNNER_TEMP}/${APP_NAME}.dmg"
+
+      - name: Notarize DMG
+        run: |
+          set -euo pipefail
+
+          xcrun notarytool submit "${RUNNER_TEMP}/${APP_NAME}.dmg" \
+            --keychain-profile "ci-notarytool-profile" \
+            --wait
+
+      - name: Staple and validate DMG
+        run: |
+          set -euo pipefail
+
+          xcrun stapler staple "${RUNNER_TEMP}/${APP_NAME}.dmg"
+          xcrun stapler validate "${RUNNER_TEMP}/${APP_NAME}.dmg"
 
       - name: Compute SHA256
         id: sha
@@ -272,4 +281,3 @@ jobs:
 
           rm -f "${RUNNER_TEMP}/certificate.p12"
           rm -f "${RUNNER_TEMP}/ExportOptions.plist"
-          rm -f "${RUNNER_TEMP}/${APP_NAME}.zip"
