@@ -27,7 +27,7 @@ targets:
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_NSHumanReadableDescription: "LiteLLM Budget Tracker"
         INFOPLIST_KEY_CFBundleDisplayName: LiteBudget
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "0.0.0"
         CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
