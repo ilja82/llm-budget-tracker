@@ -138,14 +138,24 @@ struct DevModeView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
             } else {
-                ForEach(logs) { log in
-                    Button {
-                        selectedLog = log
-                    } label: {
-                        RequestRowView(log: log)
+                ScrollView(.vertical) {
+                    VStack(spacing: 0) {
+                        ForEach(logs) { log in
+                            Button {
+                                selectedLog = log
+                            } label: {
+                                RequestRowView(log: log)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                            }
+                            .buttonStyle(.plain)
+                            if log.id != logs.last?.id {
+                                Divider()
+                            }
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
+                .frame(height: 200)
             }
         } header: {
             HStack {
@@ -174,32 +184,35 @@ struct DevModeView: View {
 
         if !recentFields.isEmpty {
             Section("Extracted Fields (latest responses)") {
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
-                    GridRow {
-                        Text("Endpoint").font(.caption).foregroundStyle(.secondary).bold()
-                        Text("Field").font(.caption).foregroundStyle(.secondary).bold()
-                        Text("Value").font(.caption).foregroundStyle(.secondary).bold()
-                    }
-                    Divider()
-                    ForEach(Array(recentFields.enumerated()), id: \.offset) { _, pair in
-                        let (endpoint, field) = pair
+                ScrollView(.vertical) {
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
                         GridRow {
-                            Text(endpoint)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            Text(field.name)
-                                .font(.caption)
-                                .monospaced()
-                            Text(field.value)
-                                .font(.caption)
-                                .monospaced()
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                            Text("Endpoint").font(.caption).foregroundStyle(.secondary).bold()
+                            Text("Field").font(.caption).foregroundStyle(.secondary).bold()
+                            Text("Value").font(.caption).foregroundStyle(.secondary).bold()
+                        }
+                        Divider()
+                        ForEach(Array(recentFields.enumerated()), id: \.offset) { _, pair in
+                            let (endpoint, field) = pair
+                            GridRow {
+                                Text(endpoint)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                Text(field.name)
+                                    .font(.caption)
+                                    .monospaced()
+                                Text(field.value)
+                                    .font(.caption)
+                                    .monospaced()
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
                         }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
+                .frame(height: 200)
             }
         }
     }
@@ -258,7 +271,8 @@ private struct RequestRowView: View {
 private struct RequestDetailView: View {
     let log: APIRequestLog
     @Environment(\.dismiss) private var dismiss
-    @State private var copied = false
+    @State private var copiedResponse = false
+    @State private var copiedRequest = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -288,23 +302,97 @@ private struct RequestDetailView: View {
             Divider()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    LabeledContent("URL") {
-                        Text(log.requestURL)
+                VStack(alignment: .leading, spacing: 16) {
+
+                    // MARK: Request
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Request")
                             .font(.caption)
-                            .monospaced()
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(.secondary)
+                            .bold()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(log.requestMethod ?? "GET")
+                                    .font(.caption)
+                                    .monospaced()
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.accentColor.opacity(0.15))
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                Text(log.requestURL)
+                                    .font(.caption)
+                                    .monospaced()
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
+                            if let params = log.requestQueryParams, !params.isEmpty {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Query Parameters")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                    ForEach(params.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                        HStack(spacing: 4) {
+                                            Text(key)
+                                                .font(.caption2)
+                                                .monospaced()
+                                                .foregroundStyle(.secondary)
+                                            Text("=")
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                            Text(value)
+                                                .font(.caption2)
+                                                .monospaced()
+                                                .textSelection(.enabled)
+                                        }
+                                    }
+                                }
+                            }
+
+                            if let headers = log.requestHeaders, !headers.isEmpty {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Headers")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                    ForEach(headers.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                        HStack(spacing: 4) {
+                                            Text(key)
+                                                .font(.caption2)
+                                                .monospaced()
+                                                .foregroundStyle(.secondary)
+                                            Text(":")
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                            Text(value)
+                                                .font(.caption2)
+                                                .monospaced()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
 
+                    // MARK: Error
                     if let err = log.errorMessage {
-                        LabeledContent("Error") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Error")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .bold()
                             Text(err)
                                 .foregroundStyle(.red)
+                                .font(.caption)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
 
+                    // MARK: Response Body
                     if !log.responseBody.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
@@ -313,13 +401,13 @@ private struct RequestDetailView: View {
                                     .foregroundStyle(.secondary)
                                     .bold()
                                 Spacer()
-                                Button(copied ? "Copied!" : "Copy") {
+                                Button(copiedResponse ? "Copied!" : "Copy") {
                                     NSPasteboard.general.clearContents()
                                     NSPasteboard.general.setString(log.responseBody, forType: .string)
-                                    copied = true
+                                    copiedResponse = true
                                     Task {
                                         try? await Task.sleep(for: .seconds(2))
-                                        copied = false
+                                        copiedResponse = false
                                     }
                                 }
                                 .font(.caption)

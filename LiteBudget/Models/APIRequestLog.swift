@@ -5,6 +5,9 @@ struct APIRequestLog: Codable, Identifiable {
     let timestamp: Date
     let endpoint: String
     let requestURL: String
+    let requestMethod: String?
+    let requestHeaders: [String: String]?
+    let requestQueryParams: [String: String]?
     let statusCode: Int?
     let responseBody: String
     let errorMessage: String?

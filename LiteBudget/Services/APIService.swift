@@ -32,15 +32,15 @@ actor APIService {
         startDate: Date,
         page: Int = 1
     ) async throws -> ([SpendLog], String, Int?) {
-        guard var components = URLComponents(string: baseURL + "/spend/logs/v2") else {
+        guard var components = URLComponents(string: baseURL + "/spend/logs") else {
             throw APIError.invalidURL
         }
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         components.queryItems = [
+            URLQueryItem(name: "api_key", value: apiKey),
             URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),
-            URLQueryItem(name: "page", value: "\(page)"),
-            URLQueryItem(name: "page_size", value: "100")
+            URLQueryItem(name: "summarize", value: "false")
         ]
         guard let url = components.url else { throw APIError.invalidURL }
         let request = authenticatedRequest(url: url, apiKey: apiKey)

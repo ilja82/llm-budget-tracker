@@ -289,6 +289,9 @@ final class BudgetViewModel {
                 timestamp: Date(),
                 endpoint: "/v2/user/info",
                 requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
+                requestMethod: "GET",
+                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
+                requestQueryParams: [:],
                 statusCode: budgetStatus,
                 responseBody: budgetJSON,
                 errorMessage: nil,
@@ -313,6 +316,9 @@ final class BudgetViewModel {
                 timestamp: Date(),
                 endpoint: "/v2/user/info",
                 requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
+                requestMethod: "GET",
+                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
+                requestQueryParams: [:],
                 statusCode: { if case .httpError(let c) = error { return c } else { return nil } }(),
                 responseBody: "",
                 errorMessage: error.localizedDescription,
@@ -333,6 +339,9 @@ final class BudgetViewModel {
                 timestamp: Date(),
                 endpoint: "/v2/user/info",
                 requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
+                requestMethod: "GET",
+                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
+                requestQueryParams: [:],
                 statusCode: nil,
                 responseBody: "",
                 errorMessage: error.localizedDescription,
@@ -419,6 +428,9 @@ final class BudgetViewModel {
         }
         let startDate = Calendar.current.date(byAdding: .day, value: -days, to: resetAt) ?? Date()
         let urlStr = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let spendQueryParams = ["start_date": fmt.string(from: startDate), "summarize": "false"]
         do {
             let (logs, rawJSON, statusCode) = try await api.fetchSpendLogs(
                 baseURL: endpointURL,
@@ -429,8 +441,11 @@ final class BudgetViewModel {
             requestLogger.add(APIRequestLog(
                 id: UUID(),
                 timestamp: Date(),
-                endpoint: "/spend/logs/v2",
-                requestURL: urlStr + "/spend/logs/v2",
+                endpoint: "/spend/logs",
+                requestURL: urlStr + "/spend/logs",
+                requestMethod: "GET",
+                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
+                requestQueryParams: spendQueryParams,
                 statusCode: statusCode,
                 responseBody: rawJSON,
                 errorMessage: nil,
@@ -440,8 +455,11 @@ final class BudgetViewModel {
             requestLogger.add(APIRequestLog(
                 id: UUID(),
                 timestamp: Date(),
-                endpoint: "/spend/logs/v2",
-                requestURL: urlStr + "/spend/logs/v2",
+                endpoint: "/spend/logs",
+                requestURL: urlStr + "/spend/logs",
+                requestMethod: "GET",
+                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
+                requestQueryParams: spendQueryParams,
                 statusCode: (error as? APIError).flatMap { if case .httpError(let c) = $0 { return c } else { return nil } },
                 responseBody: "",
                 errorMessage: error.localizedDescription,
