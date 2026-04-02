@@ -15,7 +15,7 @@ struct UsageChartView: View {
                 }
             }
         } label: {
-            Label("Daily Spending", systemImage: "chart.bar.fill")
+            Label("Daily Spend", systemImage: "chart.bar.fill")
                 .font(.caption.weight(.semibold))
         }
     }
@@ -134,7 +134,10 @@ struct UsageChartView: View {
     }
 
     private var strideCount: Int {
-        max(1, max(data.count, safeLine.count) / 6)
+        let allDates = data.map(\.date) + safeLine.map(\.date)
+        guard let earliest = allDates.min(), let latest = allDates.max() else { return 1 }
+        let spanDays = max(1, Calendar.current.dateComponents([.day], from: earliest, to: latest).day ?? 1)
+        return max(1, spanDays / 5)
     }
 
     private func barColor(for point: (date: Date, amount: Double)) -> Color {

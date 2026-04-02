@@ -90,7 +90,7 @@ final class StatusBarController {
         guard let view = hostingViewController?.view else { return }
         view.layoutSubtreeIfNeeded()
         let fittedHeight = view.fittingSize.height
-        let clampedHeight = min(max(fittedHeight, 320), 700)
+        let clampedHeight = min(max(fittedHeight, 320), 900)
         popover.contentSize = NSSize(width: 420, height: clampedHeight)
     }
 }

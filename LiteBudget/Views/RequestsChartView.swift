@@ -66,7 +66,10 @@ struct RequestsChartView: View {
     }
 
     private var strideCount: Int {
-        max(1, data.count / 6)
+        let dates = points.map(\.date)
+        guard let earliest = dates.min(), let latest = dates.max() else { return 1 }
+        let spanDays = max(1, Calendar.current.dateComponents([.day], from: earliest, to: latest).day ?? 1)
+        return max(1, spanDays / 5)
     }
 }
 

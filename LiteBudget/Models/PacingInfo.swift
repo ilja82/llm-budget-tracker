@@ -82,9 +82,9 @@ struct PacingInfo {
     var status: PacingStatus {
         guard maxBudget > 0 else { return .unknown }
         let ratio = predictedTotal / maxBudget
-        if ratio <= 0.95 { return .underPace }
-        if ratio <= 1.05 { return .onTrack }
-        if ratio <= 1.10 { return .nearLimit }
+        if ratio <= 0.85 { return .underPace }
+        if ratio <= 0.95 { return .onTrack }
+        if ratio <= 1.05 { return .nearLimit }
         return .overPace
     }
 }

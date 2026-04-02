@@ -203,22 +203,48 @@ final class BudgetViewModel {
 
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let startDate = calendar.startOfDay(
+        let billingStart = calendar.startOfDay(
             for: calendar.date(byAdding: .day, value: -totalDays, to: resetAt) ?? Date()
         )
+        let chartStart = calendar.startOfDay(
+            for: calendar.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
+        )
+        // Window starts at whichever is later: billing period start or chart window start
+        let windowStart = max(billingStart, chartStart)
+        // Cap the window at today (inclusive) so the chart doesn't extend into future dates
+        let windowEnd = calendar.date(byAdding: .day, value: 1, to: today) ?? today
+        let daysInWindow = calendar.dateComponents([.day], from: windowStart, to: windowEnd).day ?? 0
+        guard daysInWindow > 0 else { return [] }
+
         let spendByDay = Dictionary(uniqueKeysWithValues: dailySpend.map {
             (calendar.startOfDay(for: $0.date), $0.amount)
         })
 
+        // If the window starts after the billing period start, we don't have spend data
+        // for the days before the window. Estimate that pre-window spend as:
+        //   total billing spend (info.spend) − known spend for in-window past days
+        var cumulativeSpend: Double
+        if chartStart <= billingStart {
+            cumulativeSpend = 0.0
+        } else {
+            let knownWindowPastSpend = spendByDay
+                .filter { $0.key >= windowStart && $0.key < today }
+                .values.reduce(0, +)
+            cumulativeSpend = max(info.spend - knownWindowPastSpend, 0)
+        }
+
         var line: [(date: Date, amount: Double)] = []
-        var cumulativeSpend = 0.0
 
-        for dayOffset in 0..<totalDays {
-            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: startDate) else { continue }
+        let billingEnd = calendar.startOfDay(for: resetAt)
 
-            let daysIncludingCurrent = max(totalDays - dayOffset, 1)
+        for dayOffset in 0..<daysInWindow {
+            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: windowStart) else { continue }
+            // Use days remaining in the full billing period so the optimum is accurate
+            let daysRemainingInBillingPeriod = max(
+                calendar.dateComponents([.day], from: date, to: billingEnd).day ?? 1, 1
+            )
             let remainingBudget = max(maxBudget - cumulativeSpend, 0)
-            let safeAmount = remainingBudget / Double(daysIncludingCurrent)
+            let safeAmount = remainingBudget / Double(daysRemainingInBillingPeriod)
             line.append((date: date, amount: safeAmount))
 
             if date < today {
@@ -405,25 +431,43 @@ final class BudgetViewModel {
             userEmail: "dev@test.local"
         )
         budgetInfo = fakeBudgetInfo
-        spendLogs = generateFakeSpendLogs(daysPassed: daysPassed, totalSpend: devMode.spend)
+        dailyActivity = generateFakeDailyActivity(daysPassed: daysPassed, totalSpend: devMode.spend)
+        spendLogs = dailyActivity.compactMap { $0.toSpendLog() }
         computePacing(from: fakeBudgetInfo)
         lastUpdated = Date()
         errorMessage = nil
     }
 
-    private func generateFakeSpendLogs(daysPassed: Int, totalSpend: Double) -> [SpendLog] {
+    private func generateFakeDailyActivity(daysPassed: Int, totalSpend: Double) -> [DailySpendData] {
         guard daysPassed > 0 else { return [] }
-        let dailyAvg = totalSpend / Double(daysPassed)
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
         let weights = (0..<daysPassed).map { _ in Double.random(in: 0.5...1.5) }
         let totalWeight = max(weights.reduce(0, +), 0.0001)
 
         return (0..<daysPassed).map { i in
             let daysBack = daysPassed - i - 1
             let date = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-            let normalizedSpend = max(0.001, totalSpend * (weights[i] / totalWeight))
-            return SpendLog(
-                spend: totalSpend > 0 ? normalizedSpend : dailyAvg,
-                startTime: date
+            let spend = totalSpend > 0 ? max(0.001, totalSpend * (weights[i] / totalWeight)) : totalSpend / Double(daysPassed)
+            let prompt = Int.random(in: 500...5000)
+            let completion = Int.random(in: 100...1000)
+            let cacheRead = Int.random(in: 0...2000)
+            let cacheWrite = Int.random(in: 0...500)
+            let success = Int.random(in: 5...40)
+            let failed = Int.random(in: 0...3)
+            return DailySpendData(
+                date: fmt.string(from: date),
+                metrics: SpendMetrics(
+                    spend: spend,
+                    promptTokens: prompt,
+                    completionTokens: completion,
+                    cacheReadInputTokens: cacheRead,
+                    cacheCreationInputTokens: cacheWrite,
+                    totalTokens: prompt + completion + cacheRead + cacheWrite,
+                    successfulRequests: success,
+                    failedRequests: failed,
+                    apiRequests: success + failed
+                )
             )
         }
     }

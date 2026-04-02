@@ -295,12 +295,11 @@ struct StatusBadge: View {
     private var statusText: String {
         switch pacing.status {
         case .underPace:
-            let delta = pacing.expectedUse - pacing.spend
-            return String(format: "$%.2f below optimum · projected $%.2f", delta, pacing.predictedTotal)
+            return String(format: "Low usage · projected this month: $%.2f", pacing.predictedTotal)
         case .onTrack:
-            return String(format: "On track · projected $%.2f", pacing.predictedTotal)
+            return String(format: "Optimal usage · projected this month: $%.2f", pacing.predictedTotal)
         case .nearLimit:
-            return String(format: "Near limit · projected $%.2f", pacing.predictedTotal)
+            return String(format: "Near limit · projected this month: $%.2f", pacing.predictedTotal)
         case .overPace:
             if let exhaustDate = pacing.projectedBudgetExhaustDate {
                 return "Budget exhausted by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day()))"
