@@ -113,6 +113,7 @@ jobs:
           brew install xcodegen create-dmg
           xcodegen --version
           create-dmg --version || true
+          gh --version
 
       - name: Import signing certificate
         env:
@@ -187,11 +188,20 @@ jobs:
 
           test -d "${RUNNER_TEMP}/export/${APP_NAME}.app"
 
-      - name: Notarize app
+      - name: Store notarization credentials
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          xcrun notarytool store-credentials "ci-notarytool-profile" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID"
+
+      - name: Notarize app
         run: |
           set -euo pipefail
 
@@ -200,9 +210,7 @@ jobs:
             "${RUNNER_TEMP}/${APP_NAME}.zip"
 
           xcrun notarytool submit "${RUNNER_TEMP}/${APP_NAME}.zip" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
+            --keychain-profile "ci-notarytool-profile" \
             --wait
 
           xcrun stapler staple "${RUNNER_TEMP}/export/${APP_NAME}.app"
@@ -236,10 +244,15 @@ jobs:
           echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
-        with:
-          files: "${{ runner.temp }}/${{ env.APP_NAME }}.dmg"
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh release create "$GITHUB_REF_NAME" \
+            "${RUNNER_TEMP}/${APP_NAME}.dmg" \
+            --generate-notes \
+            --verify-tag
 
       - name: Show release checksum
         run: |
