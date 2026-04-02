@@ -25,6 +25,10 @@ struct PopoverView: View {
                                 safeLine: viewModel.safeSpendLine
                             )
                         }
+                        if !viewModel.dailyActivity.isEmpty {
+                            TokenChartView(data: viewModel.dailyActivity)
+                            RequestsChartView(data: viewModel.dailyActivity)
+                        }
                     }
                     .padding(14)
                 }

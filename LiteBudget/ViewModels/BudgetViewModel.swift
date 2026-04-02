@@ -72,6 +72,7 @@ final class BudgetViewModel {
 
     var budgetInfo: BudgetInfo?
     var spendLogs: [SpendLog] = []
+    var dailyActivity: [DailySpendData] = []
     var appState: AppLoadState = .loading
     var isLoading = false
     var errorMessage: String?
@@ -264,6 +265,7 @@ final class BudgetViewModel {
         guard !endpointURL.isEmpty else {
             budgetInfo = nil
             spendLogs = []
+            dailyActivity = []
             pacingInfo = nil
             appState = .notConfigured
             isLoading = false
@@ -272,6 +274,7 @@ final class BudgetViewModel {
         guard let apiKey = try? KeychainService.load(), !apiKey.isEmpty else {
             budgetInfo = nil
             spendLogs = []
+            dailyActivity = []
             pacingInfo = nil
             appState = .notConfigured
             isLoading = false
@@ -300,6 +303,7 @@ final class BudgetViewModel {
             guard info.maxBudget != nil else {
                 budgetInfo = info
                 spendLogs = []
+                dailyActivity = []
                 pacingInfo = nil
                 appState = .noBudget
                 return
@@ -439,14 +443,15 @@ final class BudgetViewModel {
             "page_size": "32"
         ]
         do {
-            let (logs, rawJSON, statusCode) = try await api.fetchDailyActivity(
+            let (activityData, rawJSON, statusCode) = try await api.fetchDailyActivity(
                 baseURL: endpointURL,
                 apiKey: apiKey,
                 userId: info.userId,
                 startDate: startDate,
                 endDate: endDate
             )
-            spendLogs = logs
+            dailyActivity = activityData
+            spendLogs = activityData.compactMap { $0.toSpendLog() }
             requestLogger.add(APIRequestLog(
                 id: UUID(),
                 timestamp: Date(),
@@ -458,7 +463,7 @@ final class BudgetViewModel {
                 statusCode: statusCode,
                 responseBody: rawJSON,
                 errorMessage: nil,
-                extractedFields: spendLogsFields(logs)
+                extractedFields: spendLogsFields(spendLogs)
             ))
         } catch {
             requestLogger.add(APIRequestLog(
@@ -475,6 +480,7 @@ final class BudgetViewModel {
                 extractedFields: []
             ))
             spendLogs = []
+            dailyActivity = []
         }
     }
 

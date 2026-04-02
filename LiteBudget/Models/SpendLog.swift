@@ -51,24 +51,58 @@ struct SpendMetrics: Codable {
     let spend: Double
     let promptTokens: Int
     let completionTokens: Int
+    let cacheReadInputTokens: Int
+    let cacheCreationInputTokens: Int
     let totalTokens: Int
+    let successfulRequests: Int
+    let failedRequests: Int
     let apiRequests: Int
 
     enum CodingKeys: String, CodingKey {
         case spend
         case promptTokens = "prompt_tokens"
         case completionTokens = "completion_tokens"
+        case cacheReadInputTokens = "cache_read_input_tokens"
+        case cacheCreationInputTokens = "cache_creation_input_tokens"
         case totalTokens = "total_tokens"
+        case successfulRequests = "successful_requests"
+        case failedRequests = "failed_requests"
         case apiRequests = "api_requests"
+    }
+
+    init(
+        spend: Double = 0,
+        promptTokens: Int = 0,
+        completionTokens: Int = 0,
+        cacheReadInputTokens: Int = 0,
+        cacheCreationInputTokens: Int = 0,
+        totalTokens: Int = 0,
+        successfulRequests: Int = 0,
+        failedRequests: Int = 0,
+        apiRequests: Int = 0
+    ) {
+        self.spend = spend
+        self.promptTokens = promptTokens
+        self.completionTokens = completionTokens
+        self.cacheReadInputTokens = cacheReadInputTokens
+        self.cacheCreationInputTokens = cacheCreationInputTokens
+        self.totalTokens = totalTokens
+        self.successfulRequests = successfulRequests
+        self.failedRequests = failedRequests
+        self.apiRequests = apiRequests
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        spend            = (try? c.decode(Double.self, forKey: .spend)) ?? 0
-        promptTokens     = (try? c.decode(Int.self, forKey: .promptTokens)) ?? 0
-        completionTokens = (try? c.decode(Int.self, forKey: .completionTokens)) ?? 0
-        totalTokens      = (try? c.decode(Int.self, forKey: .totalTokens)) ?? 0
-        apiRequests      = (try? c.decode(Int.self, forKey: .apiRequests)) ?? 0
+        spend                    = (try? c.decode(Double.self, forKey: .spend)) ?? 0
+        promptTokens             = (try? c.decode(Int.self, forKey: .promptTokens)) ?? 0
+        completionTokens         = (try? c.decode(Int.self, forKey: .completionTokens)) ?? 0
+        cacheReadInputTokens     = (try? c.decode(Int.self, forKey: .cacheReadInputTokens)) ?? 0
+        cacheCreationInputTokens = (try? c.decode(Int.self, forKey: .cacheCreationInputTokens)) ?? 0
+        totalTokens              = (try? c.decode(Int.self, forKey: .totalTokens)) ?? 0
+        successfulRequests       = (try? c.decode(Int.self, forKey: .successfulRequests)) ?? 0
+        failedRequests           = (try? c.decode(Int.self, forKey: .failedRequests)) ?? 0
+        apiRequests              = (try? c.decode(Int.self, forKey: .apiRequests)) ?? 0
     }
 }
 

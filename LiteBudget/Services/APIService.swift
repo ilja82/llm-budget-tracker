@@ -32,7 +32,7 @@ actor APIService {
         userId: String,
         startDate: Date,
         endDate: Date
-    ) async throws -> ([SpendLog], String, Int?) {
+    ) async throws -> ([DailySpendData], String, Int?) {
         guard var components = URLComponents(string: baseURL + "/user/daily/activity") else {
             throw APIError.invalidURL
         }
@@ -52,8 +52,7 @@ actor APIService {
         try validate(response)
         let rawJSON = String(data: data, encoding: .utf8) ?? ""
         let daily = try decoder.decode(DailyActivityResponse.self, from: data)
-        let logs = daily.results.compactMap { $0.toSpendLog() }
-        return (logs, rawJSON, statusCode)
+        return (daily.results, rawJSON, statusCode)
     }
 
     // MARK: - Helpers
