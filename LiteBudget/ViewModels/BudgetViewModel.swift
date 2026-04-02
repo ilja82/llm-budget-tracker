@@ -241,6 +241,7 @@ final class BudgetViewModel {
     // MARK: - Private
 
     let devMode = DevModeSettings()
+    let requestLogger = RequestLogger()
     private let api = APIService()
     @ObservationIgnored nonisolated(unsafe) private var timerTask: Task<Void, Never>?
 
@@ -282,7 +283,17 @@ final class BudgetViewModel {
         defer { isLoading = false }
 
         do {
-            let info = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            let (info, budgetJSON, budgetStatus) = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            requestLogger.add(APIRequestLog(
+                id: UUID(),
+                timestamp: Date(),
+                endpoint: "/v2/user/info",
+                requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
+                statusCode: budgetStatus,
+                responseBody: budgetJSON,
+                errorMessage: nil,
+                extractedFields: budgetInfoFields(info)
+            ))
             guard info.maxBudget != nil else {
                 budgetInfo = info
                 spendLogs = []
@@ -297,6 +308,16 @@ final class BudgetViewModel {
             appState = .loaded
             errorMessage = nil
         } catch let error as APIError {
+            requestLogger.add(APIRequestLog(
+                id: UUID(),
+                timestamp: Date(),
+                endpoint: "/v2/user/info",
+                requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
+                statusCode: { if case .httpError(let c) = error { return c } else { return nil } }(),
+                responseBody: "",
+                errorMessage: error.localizedDescription,
+                extractedFields: []
+            ))
             switch error {
             case .httpError(let code) where code == 401 || code == 403:
                 appState = .authError
@@ -307,6 +328,16 @@ final class BudgetViewModel {
             }
             errorMessage = error.localizedDescription
         } catch {
+            requestLogger.add(APIRequestLog(
+                id: UUID(),
+                timestamp: Date(),
+                endpoint: "/v2/user/info",
+                requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
+                statusCode: nil,
+                responseBody: "",
+                errorMessage: error.localizedDescription,
+                extractedFields: []
+            ))
             let nsError = error as NSError
             if nsError.domain == NSURLErrorDomain {
                 appState = .networkError
@@ -387,11 +418,37 @@ final class BudgetViewModel {
             return
         }
         let startDate = Calendar.current.date(byAdding: .day, value: -days, to: resetAt) ?? Date()
-        spendLogs = (try? await api.fetchSpendLogs(
-            baseURL: endpointURL,
-            apiKey: apiKey,
-            startDate: startDate
-        )) ?? []
+        let urlStr = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        do {
+            let (logs, rawJSON, statusCode) = try await api.fetchSpendLogs(
+                baseURL: endpointURL,
+                apiKey: apiKey,
+                startDate: startDate
+            )
+            spendLogs = logs
+            requestLogger.add(APIRequestLog(
+                id: UUID(),
+                timestamp: Date(),
+                endpoint: "/spend/logs/v2",
+                requestURL: urlStr + "/spend/logs/v2",
+                statusCode: statusCode,
+                responseBody: rawJSON,
+                errorMessage: nil,
+                extractedFields: spendLogsFields(logs)
+            ))
+        } catch {
+            requestLogger.add(APIRequestLog(
+                id: UUID(),
+                timestamp: Date(),
+                endpoint: "/spend/logs/v2",
+                requestURL: urlStr + "/spend/logs/v2",
+                statusCode: (error as? APIError).flatMap { if case .httpError(let c) = $0 { return c } else { return nil } },
+                responseBody: "",
+                errorMessage: error.localizedDescription,
+                extractedFields: []
+            ))
+            spendLogs = []
+        }
     }
 
     private func computePacing(from info: BudgetInfo) {
@@ -422,6 +479,45 @@ final class BudgetViewModel {
             expectedUse: expectedUse,
             predictedTotal: predictedTotal
         )
+    }
+
+    private func budgetInfoFields(_ info: BudgetInfo) -> [APIRequestLog.ExtractedField] {
+        var fields: [APIRequestLog.ExtractedField] = [
+            .init(name: "user_id", value: info.userId),
+            .init(name: "spend", value: String(format: "$%.4f", info.spend))
+        ]
+        if let max = info.maxBudget {
+            fields.append(.init(name: "max_budget", value: String(format: "$%.2f", max)))
+        } else {
+            fields.append(.init(name: "max_budget", value: "nil"))
+        }
+        fields.append(.init(name: "budget_duration", value: info.budgetDuration ?? "nil"))
+        if let reset = info.budgetResetAt {
+            fields.append(.init(name: "budget_reset_at", value: ISO8601DateFormatter().string(from: reset)))
+        } else {
+            fields.append(.init(name: "budget_reset_at", value: "nil"))
+        }
+        fields.append(.init(name: "user_email", value: info.userEmail ?? "nil"))
+        return fields
+    }
+
+    private func spendLogsFields(_ logs: [SpendLog]) -> [APIRequestLog.ExtractedField] {
+        let total = logs.reduce(0.0) { $0 + $1.spend }
+        let models = Set(logs.compactMap { $0.model }).sorted().joined(separator: ", ")
+        let dates = logs.map { $0.startTime }
+        var fields: [APIRequestLog.ExtractedField] = [
+            .init(name: "log_count", value: "\(logs.count)"),
+            .init(name: "total_spend", value: String(format: "$%.4f", total))
+        ]
+        if let earliest = dates.min(), let latest = dates.max() {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyy-MM-dd"
+            fields.append(.init(name: "date_range", value: "\(fmt.string(from: earliest)) – \(fmt.string(from: latest))"))
+        }
+        if !models.isEmpty {
+            fields.append(.init(name: "models", value: models))
+        }
+        return fields
     }
 
     /// Parses "30d", "24h", "1m" into a finite number of days.

@@ -16,12 +16,14 @@ actor APIService {
 
     // MARK: - Public
 
-    func fetchBudgetInfo(baseURL: String, apiKey: String) async throws -> BudgetInfo {
+    func fetchBudgetInfo(baseURL: String, apiKey: String) async throws -> (BudgetInfo, String, Int?) {
         let url = try endpoint(base: baseURL, path: "/v2/user/info")
         let request = authenticatedRequest(url: url, apiKey: apiKey)
         let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode
         try validate(response)
-        return try decoder.decode(BudgetInfo.self, from: data)
+        let rawJSON = String(data: data, encoding: .utf8) ?? ""
+        return (try decoder.decode(BudgetInfo.self, from: data), rawJSON, statusCode)
     }
 
     func fetchSpendLogs(
@@ -29,7 +31,7 @@ actor APIService {
         apiKey: String,
         startDate: Date,
         page: Int = 1
-    ) async throws -> [SpendLog] {
+    ) async throws -> ([SpendLog], String, Int?) {
         guard var components = URLComponents(string: baseURL + "/spend/logs/v2") else {
             throw APIError.invalidURL
         }
@@ -43,9 +45,11 @@ actor APIService {
         guard let url = components.url else { throw APIError.invalidURL }
         let request = authenticatedRequest(url: url, apiKey: apiKey)
         let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode
         try validate(response)
-        if let logs = try? decoder.decode([SpendLog].self, from: data) { return logs }
-        return try decoder.decode(SpendLogsResponse.self, from: data).data
+        let rawJSON = String(data: data, encoding: .utf8) ?? ""
+        if let logs = try? decoder.decode([SpendLog].self, from: data) { return (logs, rawJSON, statusCode) }
+        return (try decoder.decode(SpendLogsResponse.self, from: data).data, rawJSON, statusCode)
     }
 
     // MARK: - Helpers
