@@ -34,7 +34,7 @@ A macOS Menu Bar app that tracks your [LiteLLM](https://github.com/BerriAI/litel
 ### Option A — Homebrew (after a release is published)
 
 ```bash
-brew tap ilja82/llm-budget-tracker
+brew tap ilja82/tap
 brew install --cask llm-budget-tracker
 ```
 
@@ -122,7 +122,6 @@ LLMBudgetTracker/
 ├── LLMBudgetTrackerApp.swift     # @main — MenuBarExtra + Settings scenes
 └── LLMBudgetTracker.entitlements
 project.yml                       # XcodeGen project spec
-Casks/llm-budget-tracker.rb       # Homebrew Cask formula
 .github/workflows/build.yml       # CI/CD: build on PRs, DMG release on tags
 ```
 
@@ -162,4 +161,4 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The CI workflow handles everything else: sign → notarize → DMG → GitHub Release → Homebrew Cask update.
+The CI workflow handles everything else: sign → notarize → DMG → GitHub Release.
