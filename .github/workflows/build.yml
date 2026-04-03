@@ -165,6 +165,22 @@ jobs:
 
           test -f "${RUNNER_TEMP}/${APP_NAME}.dmg"
 
+      - name: Sign DMG
+        run: |
+          set -euo pipefail
+
+          KEYCHAIN_PATH="${RUNNER_TEMP}/ci-signing.keychain-db"
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep "Developer ID Application" \
+            | head -1 \
+            | sed -E 's/.*"(.+)".*/\1/')
+
+          codesign --sign "$SIGNING_IDENTITY" \
+            --timestamp \
+            "${RUNNER_TEMP}/${APP_NAME}.dmg"
+
+          codesign --verify --verbose=2 "${RUNNER_TEMP}/${APP_NAME}.dmg"
+
       - name: Notarize DMG
         run: |
           set -euo pipefail
