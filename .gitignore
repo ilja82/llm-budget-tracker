@@ -12,3 +12,5 @@ xcuserdata/
 
 # macOS metadata
 .DS_Store
+
+/litellm

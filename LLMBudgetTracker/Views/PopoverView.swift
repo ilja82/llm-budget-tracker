@@ -47,7 +47,7 @@ struct PopoverView: View {
         HStack {
             Image(systemName: "dollarsign.circle.fill")
                 .foregroundStyle(Color.accentColor)
-            Text("LiteBudget")
+            Text("LLM Budget Tracker")
                 .font(.headline)
             if viewModel.devMode.isEnabled {
                 Text("DEV")

@@ -196,7 +196,7 @@ struct SettingsView: View {
         } footer: {
             HStack {
                 Spacer()
-                Text("LiteBudget v1.0")
+                Text("LLM Budget Tracker v0.0.0")
                     .font(.caption2)
                     .foregroundStyle(devModeUnlocked ? Color.orange.opacity(0.6) : Color.secondary.opacity(0.5))
                     .onTapGesture {

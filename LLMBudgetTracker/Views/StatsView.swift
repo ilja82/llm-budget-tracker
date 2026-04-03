@@ -25,12 +25,12 @@ struct StatsView: View {
         case .networkError:
             errorCard(
                 title: "Server unreachable",
-                message: "LiteBudget could not reach your LiteLLM proxy. Check the Proxy URL and your network connection."
+                message: "LLM Budget Tracker could not reach your LiteLLM proxy. Check the Proxy URL and your network connection."
             )
         case .invalidData:
             errorCard(
                 title: "Invalid response data",
-                message: "LiteBudget received incomplete or malformed budget data."
+                message: "LLM Budget Tracker received incomplete or malformed budget data."
             )
         case .noBudget:
             errorCard(

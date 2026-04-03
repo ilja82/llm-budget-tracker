@@ -16,9 +16,9 @@ defaults:
     shell: bash
 
 env:
-  SCHEME: LiteBudget
+  SCHEME: LLMBudgetTracker
   CONFIGURATION: Release
-  APP_NAME: LiteBudget
+  APP_NAME: LLMBudgetTracker
 
 permissions:
   contents: read

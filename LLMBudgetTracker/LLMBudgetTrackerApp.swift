@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct LiteBudgetApp: App {
+struct LLMBudgetTrackerApp: App {
     private let statusBarController = StatusBarController()
 
     var body: some Scene {

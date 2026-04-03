@@ -1,4 +1,4 @@
-name: LiteBudget
+name: LLMBudgetTracker
 options:
   bundleIdPrefix: com.ilja82
   deploymentTarget:
@@ -7,26 +7,26 @@ options:
   createIntermediateGroups: true
 
 targets:
-  LiteBudget:
+  LLMBudgetTracker:
     type: application
     platform: macOS
     deploymentTarget: "26.0"
     sources:
-      - path: LiteBudget
+      - path: LLMBudgetTracker
         excludes:
           - "*.entitlements"
     resources:
-      - LiteBudget/Assets.xcassets
+      - LLMBudgetTracker/Assets.xcassets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.lite-budget
+        PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker
         SWIFT_VERSION: "6.0"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
-        CODE_SIGN_ENTITLEMENTS: LiteBudget/LiteBudget.entitlements
+        CODE_SIGN_ENTITLEMENTS: LLMBudgetTracker/LLMBudgetTracker.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
-        INFOPLIST_KEY_NSHumanReadableDescription: "LiteLLM Budget Tracker"
-        INFOPLIST_KEY_CFBundleDisplayName: LiteBudget
+        INFOPLIST_KEY_NSHumanReadableDescription: "LLM Budget Tracker"
+        INFOPLIST_KEY_CFBundleDisplayName: LLM Budget Tracker
         MARKETING_VERSION: "0.0.0"
         CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic

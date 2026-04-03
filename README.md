@@ -1,4 +1,4 @@
-# LiteBudget
+# LLM Budget Tracker
 
 A macOS Menu Bar app that tracks your [LiteLLM](https://github.com/BerriAI/litellm) proxy budget usage in real time.
 
@@ -34,16 +34,16 @@ A macOS Menu Bar app that tracks your [LiteLLM](https://github.com/BerriAI/litel
 ### Option A — Homebrew (after a release is published)
 
 ```bash
-brew tap ilja82/lite-budget
-brew install --cask lite-budget
+brew tap ilja82/llm-budget-tracker
+brew install --cask llm-budget-tracker
 ```
 
 ### Option B — Build from source
 
 ```bash
 # 1. Clone
-git clone https://github.com/ilja82/lite-budget.git
-cd lite-budget
+git clone https://github.com/ilja82/llm-budget-tracker.git
+cd llm-budget-tracker
 
 # 2. Install XcodeGen (if not already installed)
 brew install xcodegen
@@ -52,12 +52,12 @@ brew install xcodegen
 xcodegen generate
 
 # 4. Open in Xcode and run
-open LiteBudget.xcodeproj
+open LLMBudgetTracker.xcodeproj
 ```
 
 Press **⌘R** in Xcode to build and run. The app will appear in your menu bar immediately.
 
-> **Note:** `LiteBudget.xcodeproj` is not committed — it is generated from `project.yml`.
+> **Note:** `LLMBudgetTracker.xcodeproj` is not committed — it is generated from `project.yml`.
 > Run `xcodegen generate` after every `git clone` or `git pull` before opening Xcode.
 
 ---
@@ -100,7 +100,7 @@ The API key is sent as the `x-litellm-api-key` request header.
 ## Project structure
 
 ```
-LiteBudget/
+LLMBudgetTracker/
 ├── Models/
 │   ├── BudgetInfo.swift          # Codable response from /v2/user/info
 │   ├── SpendLog.swift            # Codable response from /spend/logs/v2
@@ -119,10 +119,10 @@ LiteBudget/
 │   ├── PacingView.swift          # Expected vs actual pacing group box
 │   ├── UsageChartView.swift      # Swift Charts daily spend bar chart
 │   └── SettingsView.swift        # Settings form window
-├── LiteBudgetApp.swift           # @main — MenuBarExtra + Settings scenes
-└── LiteBudget.entitlements
+├── LLMBudgetTrackerApp.swift     # @main — MenuBarExtra + Settings scenes
+└── LLMBudgetTracker.entitlements
 project.yml                       # XcodeGen project spec
-Casks/lite-budget.rb              # Homebrew Cask formula
+Casks/llm-budget-tracker.rb       # Homebrew Cask formula
 .github/workflows/build.yml       # CI/CD: build on PRs, DMG release on tags
 ```
 
@@ -141,7 +141,7 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) runs in two stages:
 3. Notarizes with Apple.
 4. Packages a `.dmg` with `create-dmg`.
 5. Creates a GitHub Release and uploads the DMG.
-6. Patches the SHA256 and version in `Casks/lite-budget.rb` and pushes the update.
+6. Patches the SHA256 and version in `Casks/llm-budget-tracker.rb` and pushes the update.
 
 ### Required repository secrets
 

@@ -116,7 +116,7 @@ final class BudgetViewModel {
     var menuBarTooltip: String {
         switch appState {
         case .notConfigured:
-            return "LiteBudget — Not configured\nOpen Settings to connect."
+            return "LLM Budget Tracker — Not configured\nOpen Settings to connect."
         case .authError:
             return "Authentication failed\nCheck your API key in Settings."
         case .networkError:
