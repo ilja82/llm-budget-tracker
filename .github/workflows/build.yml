@@ -1,8 +1,6 @@
 name: Build & Release
 
 on:
-  pull_request:
-    branches: [main]
   push:
     tags:
       - 'v*'
@@ -24,68 +22,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build macOS App (unsigned)
-    if: github.event_name == 'pull_request'
-    runs-on: macos-26
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-          fetch-depth: 1
-
-      - name: Select Xcode
-        run: |
-          set -euo pipefail
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-          xcodebuild -version
-
-      - name: Install XcodeGen
-        run: |
-          set -euo pipefail
-          brew install xcodegen
-          xcodegen --version
-
-      - name: Generate Xcode project
-        run: |
-          set -euo pipefail
-          xcodegen generate
-
-      - name: Build (unsigned)
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -project "${APP_NAME}.xcodeproj" \
-            -scheme "$SCHEME" \
-            -configuration "$CONFIGURATION" \
-            -destination "platform=macOS" \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            SYMROOT="${RUNNER_TEMP}/build" \
-            build
-
-      - name: Verify unsigned app exists
-        run: |
-          set -euo pipefail
-          test -d "${RUNNER_TEMP}/build/Release/${APP_NAME}.app"
-
-      - name: Upload unsigned build artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: "${{ env.APP_NAME }}-unsigned"
-          path: "${{ runner.temp }}/build/Release/${{ env.APP_NAME }}.app"
-          if-no-files-found: error
-          retention-days: 7
-
   release:
     name: Sign, Notarize & Release
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-26
 
     environment:
