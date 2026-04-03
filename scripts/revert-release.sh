@@ -34,10 +34,10 @@ git push origin --delete "$TAG"
 echo "Deleting local tag $TAG..."
 git tag -d "$TAG"
 
-echo "Reverting release commit..."
-git revert HEAD --no-edit
+echo "Removing release commit from history..."
+git reset --hard HEAD~1
 
-echo "Pushing to main..."
-git push origin main
+echo "Force pushing to main..."
+git push origin main --force
 
 echo "Done. $TAG has been reverted. Fix the issue and run ./scripts/release.sh $VERSION again."
