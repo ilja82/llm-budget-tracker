@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PopoverView: View {
-    var closePopover: (() -> Void)? = nil
+    var closePopover: () -> Void = {}
     @Environment(BudgetViewModel.self) private var viewModel
     @Environment(\.openSettings) private var openSettings
 
@@ -67,7 +67,7 @@ struct PopoverView: View {
                 ProgressView().controlSize(.small)
             }
             Button {
-                closePopover?()
+                closePopover()
                 NSApp.activate(ignoringOtherApps: true)
                 DispatchQueue.main.async { openSettings() }
             } label: {
@@ -100,7 +100,7 @@ struct PopoverView: View {
                     .multilineTextAlignment(.center)
             }
             Button("Open Settings") {
-                closePopover?()
+                closePopover()
                 NSApp.activate(ignoringOtherApps: true)
                 DispatchQueue.main.async { openSettings() }
             }

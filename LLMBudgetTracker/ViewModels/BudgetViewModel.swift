@@ -80,18 +80,18 @@ final class BudgetViewModel {
 
     // MARK: - State
 
-    var budgetInfo: BudgetInfo? {
+    private(set) var budgetInfo: BudgetInfo? {
         didSet { _safeSpendLine = nil }
     }
-    var spendLogs: [SpendLog] = [] {
+    private(set) var spendLogs: [SpendLog] = [] {
         didSet { _dailySpend = nil; _safeSpendLine = nil }
     }
-    var dailyActivity: [DailySpendData] = []
-    var appState: AppLoadState = .loading
-    var isLoading = false
-    var errorMessage: String?
-    var lastUpdated: Date?
-    var pacingInfo: PacingInfo?
+    private(set) var dailyActivity: [DailySpendData] = []
+    private(set) var appState: AppLoadState = .loading
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
+    private(set) var lastUpdated: Date?
+    private(set) var pacingInfo: PacingInfo?
 
     var nextRefresh: Date? {
         guard let last = lastUpdated else { return nil }
@@ -294,7 +294,7 @@ final class BudgetViewModel {
     let devMode = DevModeSettings()
     let requestLogger = RequestLogger()
     private let api = APIService()
-    @ObservationIgnored nonisolated(unsafe) private var timerTask: Task<Void, Never>?
+    @ObservationIgnored private var timerTask: Task<Void, Never>?
 
     @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]? = nil
     @ObservationIgnored private var _safeSpendLine: [(date: Date, amount: Double)]? = nil
@@ -346,79 +346,62 @@ final class BudgetViewModel {
         defer { isLoading = false }
 
         do {
-            let (info, budgetJSON, budgetStatus) = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
-            requestLogger.add(APIRequestLog(
-                id: UUID(),
-                timestamp: Date(),
-                endpoint: "/v2/user/info",
-                requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
-                requestMethod: "GET",
-                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: [:],
-                statusCode: budgetStatus,
-                responseBody: budgetJSON,
-                errorMessage: nil,
-                extractedFields: budgetInfoFields(info)
-            ))
-            guard info.maxBudget != nil else {
-                budgetInfo = info
-                spendLogs = []
-                dailyActivity = []
-                pacingInfo = nil
-                appState = .noBudget
-                return
-            }
-            budgetInfo = info
-            await fetchLogs(apiKey: apiKey, info: info)
-            computePacing(from: info)
-            lastUpdated = Date()
-            appState = .loaded
-            errorMessage = nil
-        } catch let error as APIError {
-            requestLogger.add(APIRequestLog(
-                id: UUID(),
-                timestamp: Date(),
-                endpoint: "/v2/user/info",
-                requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
-                requestMethod: "GET",
-                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: [:],
-                statusCode: { if case .httpError(let c) = error { return c } else { return nil } }(),
-                responseBody: "",
-                errorMessage: error.localizedDescription,
-                extractedFields: []
-            ))
-            switch error {
-            case .httpError(let code) where code == 401 || code == 403:
-                appState = .authError
-            case .httpError:
-                appState = .networkError
-            case .invalidURL:
-                appState = .networkError
-            }
-            errorMessage = error.localizedDescription
+            let (info, json, status) = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            await handleBudgetSuccess(info: info, rawJSON: json, statusCode: status, apiKey: apiKey)
         } catch {
-            requestLogger.add(APIRequestLog(
-                id: UUID(),
-                timestamp: Date(),
-                endpoint: "/v2/user/info",
-                requestURL: endpointURL.trimmingCharacters(in: .init(charactersIn: "/")) + "/v2/user/info",
-                requestMethod: "GET",
-                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: [:],
-                statusCode: nil,
-                responseBody: "",
-                errorMessage: error.localizedDescription,
-                extractedFields: []
-            ))
-            let nsError = error as NSError
-            if nsError.domain == NSURLErrorDomain {
-                appState = .networkError
-            } else {
-                appState = .unknownError
-            }
-            errorMessage = error.localizedDescription
+            handleRefreshError(error)
         }
+    }
+
+    private func handleBudgetSuccess(
+        info: BudgetInfo, rawJSON: String, statusCode: Int?, apiKey: String
+    ) async {
+        logAPIRequest(
+            endpoint: "/v2/user/info",
+            statusCode: statusCode,
+            responseBody: rawJSON,
+            errorMessage: nil,
+            extractedFields: budgetInfoFields(info)
+        )
+        guard info.maxBudget != nil else {
+            budgetInfo = info
+            spendLogs = []
+            dailyActivity = []
+            pacingInfo = nil
+            appState = .noBudget
+            return
+        }
+        budgetInfo = info
+        await fetchLogs(apiKey: apiKey, info: info)
+        computePacing(from: info)
+        lastUpdated = Date()
+        appState = .loaded
+        errorMessage = nil
+    }
+
+    private func handleRefreshError(_ error: Error) {
+        let statusCode: Int? = {
+            guard let apiErr = error as? APIError,
+                  case .httpError(let c) = apiErr else { return nil }
+            return c
+        }()
+        logAPIRequest(
+            endpoint: "/v2/user/info",
+            statusCode: statusCode,
+            responseBody: "",
+            errorMessage: error.localizedDescription,
+            extractedFields: []
+        )
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .httpError(let code) where code == 401 || code == 403: appState = .authError
+            case .httpError: appState = .networkError
+            case .invalidURL: appState = .networkError
+            }
+        } else {
+            appState = (error as NSError).domain == NSURLErrorDomain ? .networkError : .unknownError
+        }
+        errorMessage = error.localizedDescription
     }
 
     @MainActor
@@ -535,6 +518,30 @@ final class BudgetViewModel {
 
     // MARK: - Helpers
 
+    private func logAPIRequest(
+        endpoint: String,
+        queryParams: [String: String] = [:],
+        statusCode: Int?,
+        responseBody: String,
+        errorMessage: String?,
+        extractedFields: [APIRequestLog.ExtractedField]
+    ) {
+        let base = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        requestLogger.add(APIRequestLog(
+            id: UUID(),
+            timestamp: Date(),
+            endpoint: endpoint,
+            requestURL: base + endpoint,
+            requestMethod: "GET",
+            requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
+            requestQueryParams: queryParams,
+            statusCode: statusCode,
+            responseBody: responseBody,
+            errorMessage: errorMessage,
+            extractedFields: extractedFields
+        ))
+    }
+
     private func fetchLogs(apiKey: String, info: BudgetInfo) async {
         guard info.budgetResetAt != nil else {
             spendLogs = []
@@ -542,7 +549,6 @@ final class BudgetViewModel {
         }
         let startDate = Calendar.current.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
         let endDate = Date()
-        let urlStr = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
         let fmt = Self.dailyFmt
         let queryParams: [String: String] = [
             "user_id": info.userId,
@@ -561,33 +567,23 @@ final class BudgetViewModel {
             )
             dailyActivity = activityData
             spendLogs = activityData.compactMap { $0.toSpendLog() }
-            requestLogger.add(APIRequestLog(
-                id: UUID(),
-                timestamp: Date(),
+            logAPIRequest(
                 endpoint: "/user/daily/activity",
-                requestURL: urlStr + "/user/daily/activity",
-                requestMethod: "GET",
-                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: queryParams,
+                queryParams: queryParams,
                 statusCode: statusCode,
                 responseBody: rawJSON,
                 errorMessage: nil,
                 extractedFields: spendLogsFields(spendLogs)
-            ))
+            )
         } catch {
-            requestLogger.add(APIRequestLog(
-                id: UUID(),
-                timestamp: Date(),
+            logAPIRequest(
                 endpoint: "/user/daily/activity",
-                requestURL: urlStr + "/user/daily/activity",
-                requestMethod: "GET",
-                requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-                requestQueryParams: queryParams,
+                queryParams: queryParams,
                 statusCode: (error as? APIError).flatMap { if case .httpError(let c) = $0 { return c } else { return nil } },
                 responseBody: "",
                 errorMessage: error.localizedDescription,
                 extractedFields: []
-            ))
+            )
             spendLogs = []
             dailyActivity = []
         }

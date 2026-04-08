@@ -1,12 +1,15 @@
 import Foundation
 
 actor APIService {
-    private nonisolated(unsafe) static let dailyFmt: DateFormatter = {
+    // DateFormatter is not thread-safe: keep as actor-isolated instance property
+    private let dailyFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
 
+    // ISO8601DateFormatter is documented as thread-safe; used from non-isolated
+    // dateDecodingStrategy closure so marked nonisolated(unsafe)
     private nonisolated(unsafe) static let iso8601WithFractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -54,7 +57,7 @@ actor APIService {
         guard var components = URLComponents(string: baseURL + "/user/daily/activity") else {
             throw APIError.invalidURL
         }
-        let fmt = Self.dailyFmt
+        let fmt = dailyFmt
         components.queryItems = [
             URLQueryItem(name: "user_id", value: userId),
             URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),

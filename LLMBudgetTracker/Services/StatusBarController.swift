@@ -47,7 +47,7 @@ final class StatusBarController {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             updatePopoverSize()
             popover.contentViewController?.view.window?.makeKey()
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.popover.contentViewController?.view.window?.makeFirstResponder(nil)
                 self?.updatePopoverSize()
             }
@@ -88,7 +88,6 @@ final class StatusBarController {
 
     private func updatePopoverSize() {
         guard let view = hostingViewController?.view else { return }
-        view.layoutSubtreeIfNeeded()
         let fittedHeight = view.fittingSize.height
         let clampedHeight = min(max(fittedHeight, 320), 900)
         popover.contentSize = NSSize(width: 420, height: clampedHeight)

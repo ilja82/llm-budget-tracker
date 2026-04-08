@@ -84,13 +84,7 @@ struct BudgetCard: View {
             let pct = info.maxBudget.map { info.spend / $0 } ?? 0
             return pct > 0.9 ? .red : pct > 0.75 ? .orange : .green
         }
-        switch p.status {
-        case .underPace: return .green
-        case .onTrack: return .green
-        case .nearLimit: return .orange
-        case .overPace: return .red
-        case .unknown: return .secondary
-        }
+        return p.status.statusColor
     }
 
     var body: some View {
@@ -143,6 +137,19 @@ struct BudgetCard: View {
                         .strokeBorder(statusColor.opacity(0.18), lineWidth: 1)
                 )
         )
+    }
+}
+
+// MARK: - PacingStatus + Color
+
+private extension PacingStatus {
+    var statusColor: Color {
+        switch self {
+        case .underPace, .onTrack: return .green
+        case .nearLimit: return .orange
+        case .overPace: return .red
+        case .unknown: return .secondary
+        }
     }
 }
 

@@ -50,7 +50,11 @@ final class RequestLogger {
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(logs) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        do {
+            let data = try JSONEncoder().encode(logs)
+            UserDefaults.standard.set(data, forKey: key)
+        } catch {
+            print("[RequestLogger] Failed to encode logs: \(error)")
+        }
     }
 }

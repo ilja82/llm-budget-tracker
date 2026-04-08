@@ -66,7 +66,16 @@ struct PacingInfo {
     }
 
     var isOverBudget: Bool {
-        predictedTotal > maxBudget * 1.02
+        predictedTotal > maxBudget * Thresholds.overBudgetMin
+    }
+
+    // MARK: - Pacing Thresholds
+
+    private enum Thresholds {
+        static let underPaceMax: Double  = 0.85
+        static let onTrackMax: Double    = 0.95
+        static let nearLimitMax: Double  = 1.05
+        static let overBudgetMin: Double = 1.02
     }
 
     /// Estimated date when budget will be exhausted if current pace continues
@@ -82,9 +91,9 @@ struct PacingInfo {
     var status: PacingStatus {
         guard maxBudget > 0 else { return .unknown }
         let ratio = predictedTotal / maxBudget
-        if ratio <= 0.85 { return .underPace }
-        if ratio <= 0.95 { return .onTrack }
-        if ratio <= 1.05 { return .nearLimit }
+        if ratio <= Thresholds.underPaceMax  { return .underPace }
+        if ratio <= Thresholds.onTrackMax    { return .onTrack }
+        if ratio <= Thresholds.nearLimitMax  { return .nearLimit }
         return .overPace
     }
 }

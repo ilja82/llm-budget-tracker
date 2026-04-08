@@ -139,10 +139,11 @@ struct UsageChartView: View {
     }
 
     private func barColor(for point: (date: Date, amount: Double)) -> Color {
+        let overspendThreshold = 1.2
         guard let safe = safeLimit(for: point.date), safe > 0 else {
             return Color.accentColor
         }
-        if point.amount > safe * 1.2 { return .red }
+        if point.amount > safe * overspendThreshold { return .red }
         if point.amount > safe { return .orange }
         return Color.accentColor
     }
