@@ -4,6 +4,7 @@ struct DevModeView: View {
     @Environment(BudgetViewModel.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
     @State private var selectedLog: APIRequestLog?
+    @State private var showResetConfirmation = false
 
     var body: some View {
         @Bindable var dev = viewModel.devMode
@@ -15,8 +16,21 @@ struct DevModeView: View {
                 valuesSection(dev: $dev)
                 requestLogSection
                 extractedFieldsSection
+                resetSection
             }
             .formStyle(.grouped)
+            .confirmationDialog(
+                "Reset to Initial State?",
+                isPresented: $showResetConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Reset Everything", role: .destructive) {
+                    viewModel.resetToInitialState()
+                    dismiss()
+                }
+            } message: {
+                Text("This will erase all settings, the API key, and request logs. The app will return to its initial unconfigured state.")
+            }
         }
         .frame(minWidth: 480, idealWidth: 480, maxWidth: 480)
         .fixedSize(horizontal: false, vertical: true)
@@ -123,6 +137,22 @@ struct DevModeView: View {
                 }
             }
             .disabled(!viewModel.devMode.isEnabled)
+        }
+    }
+
+    // MARK: - Reset
+
+    private var resetSection: some View {
+        Section("Danger Zone") {
+            Button(role: .destructive) {
+                showResetConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Reset to Initial State")
+                    Spacer()
+                }
+            }
         }
     }
 

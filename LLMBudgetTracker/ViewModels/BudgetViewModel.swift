@@ -414,6 +414,41 @@ final class BudgetViewModel {
         }
     }
 
+    // MARK: - Reset
+
+    @MainActor
+    func resetToInitialState() {
+        let defaults = UserDefaults.standard
+        for key in ["endpointURL", "updateIntervalMinutes", "displayMode", "chartDays",
+                    "devMode.isEnabled", "devMode.spend", "devMode.hasMaxBudget", "devMode.maxBudget",
+                    "devMode.hasReset", "devMode.daysRemaining", "devMode.totalDays",
+                    "devMode.unlocked", "devLog.requests"] {
+            defaults.removeObject(forKey: key)
+        }
+        KeychainService.delete()
+        requestLogger.clear()
+
+        endpointURL = ""
+        updateIntervalMinutes = 60
+        displayMode = .dollar
+        chartDays = 14
+        devMode.isEnabled = false
+        devMode.spend = 45.50
+        devMode.hasMaxBudget = true
+        devMode.maxBudget = 100.00
+        devMode.hasReset = true
+        devMode.daysRemaining = 12
+        devMode.totalDays = 30
+
+        budgetInfo = nil
+        spendLogs = []
+        dailyActivity = []
+        pacingInfo = nil
+        errorMessage = nil
+        lastUpdated = nil
+        appState = .notConfigured
+    }
+
     // MARK: - Dev Mode
 
     @MainActor
