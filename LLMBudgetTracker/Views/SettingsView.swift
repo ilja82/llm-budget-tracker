@@ -62,6 +62,7 @@ struct SettingsView: View {
                 }
 
             HStack(spacing: 8) {
+                Spacer()
                 Button("Test Connection") {
                     performConnectionTest()
                 }
@@ -72,8 +73,6 @@ struct SettingsView: View {
                 }
                 .disabled(isTesting || !canSave)
                 .buttonStyle(.borderedProminent)
-
-                Spacer()
             }
 
             connectionStatusView
@@ -89,7 +88,7 @@ struct SettingsView: View {
             EmptyView()
         case .testing:
             HStack(spacing: 6) {
-                ProgressView().scaleEffect(0.7)
+                ProgressView().controlSize(.small)
                 Text("Testing connection...")
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -9,6 +9,8 @@ struct MenuBarLabel: View {
             color: viewModel.pacingBarColor,
             label: viewModel.menuBarText
         )
+        .accessibilityLabel("LLM Budget: \(viewModel.menuBarText)")
+        .accessibilityHint("Click to open budget overview")
     }
 }
 

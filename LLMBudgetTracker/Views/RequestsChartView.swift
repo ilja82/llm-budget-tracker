@@ -49,20 +49,29 @@ struct RequestsChartView: View {
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: strideCount)) { _ in
                 AxisValueLabel(format: .dateTime.month().day(), centered: true)
-                    .font(.system(size: 9))
+                    .font(.caption2)
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
                     if let v = value.as(Int.self) {
-                        Text("\(v)").font(.system(size: 9))
+                        Text("\(v)").font(.caption2)
                     }
                 }
             }
         }
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 100)
+        .accessibilityLabel(chartAccessibilityLabel)
+        .accessibilityHint("Daily API requests stacked bar chart")
+    }
+
+    private var chartAccessibilityLabel: String {
+        guard !data.isEmpty else { return "No request data available" }
+        let totalSuccess = data.reduce(0) { $0 + $1.metrics.successfulRequests }
+        let totalFailed = data.reduce(0) { $0 + $1.metrics.failedRequests }
+        return "API requests over \(data.count) days. \(totalSuccess) successful, \(totalFailed) failed."
     }
 
     private var strideCount: Int {

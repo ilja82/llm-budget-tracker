@@ -4,58 +4,64 @@ struct StatsView: View {
     @Environment(BudgetViewModel.self) private var viewModel
 
     var body: some View {
-        switch viewModel.appState {
-        case .notConfigured:
-            EmptyView()
-        case .loading:
-            GroupBox {
-                HStack(spacing: 8) {
-                    ProgressView().scaleEffect(0.7)
-                    Text("Loading...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        Group {
+            switch viewModel.appState {
+            case .notConfigured:
+                EmptyView()
+            case .loading:
+                GroupBox {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.mini)
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
-            }
-        case .authError:
-            errorCard(
-                title: "Authentication failed",
-                message: "Your API key was rejected. Check your API key in Settings."
-            )
-        case .networkError:
-            errorCard(
-                title: "Server unreachable",
-                message: "LLM Budget Tracker could not reach your LiteLLM proxy. Check the Proxy URL and your network connection."
-            )
-        case .invalidData:
-            errorCard(
-                title: "Invalid response data",
-                message: "LLM Budget Tracker received incomplete or malformed budget data."
-            )
-        case .noBudget:
-            errorCard(
-                title: "No budget found",
-                message: "Your LiteLLM account does not currently have budget data available."
-            )
-        case .unknownError:
-            errorCard(
-                title: "Something went wrong",
-                message: viewModel.errorMessage ?? "An unexpected error occurred."
-            )
-        case .loaded, .refreshing:
-            if let info = viewModel.budgetInfo {
-                BudgetCard(info: info, pacing: viewModel.pacingInfo, displayMode: viewModel.displayMode)
+            case .authError:
+                errorCard(
+                    title: "Authentication failed",
+                    message: "Your API key was rejected. Check your API key in Settings."
+                )
+            case .networkError:
+                errorCard(
+                    title: "Server unreachable",
+                    message: "LLM Budget Tracker could not reach your LiteLLM proxy. Check the Proxy URL and your network connection."
+                )
+            case .invalidData:
+                errorCard(
+                    title: "Invalid response data",
+                    message: "LLM Budget Tracker received incomplete or malformed budget data."
+                )
+            case .noBudget:
+                errorCard(
+                    title: "No budget found",
+                    message: "Your LiteLLM account does not currently have budget data available."
+                )
+            case .unknownError:
+                errorCard(
+                    title: "Something went wrong",
+                    message: viewModel.errorMessage ?? "An unexpected error occurred."
+                )
+            case .loaded, .refreshing:
+                if let info = viewModel.budgetInfo {
+                    BudgetCard(info: info, pacing: viewModel.pacingInfo, displayMode: viewModel.displayMode)
+                }
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.appState)
     }
 
     private func errorCard(title: String, message: String) -> some View {
         GroupBox {
             VStack(spacing: 6) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                }
                 Text(message)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -103,10 +109,11 @@ struct BudgetCard: View {
                     Text(heroText)
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(statusColor)
+                        .accessibilityLabel(String(format: "Remaining: $%.2f (%.0f%% of $%.2f budget)", remaining, percentage, max))
                     if let resetAt = info.budgetResetAt {
                         let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
                         Text("Resets in \(Swift.max(0, days))d")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                 } else {
@@ -147,6 +154,11 @@ struct BudgetBar: View {
 
     private var scale: Double {
         pacing.maxBudget * 1.06
+    }
+
+    private var budgetBarAccessibilityLabel: String {
+        String(format: "Budget progress: $%.2f spent of $%.2f maximum. Optimum: $%.2f. Projected: $%.2f.",
+            pacing.spend, pacing.maxBudget, pacing.expectedUse, pacing.predictedTotal)
     }
 
     var body: some View {
@@ -209,6 +221,8 @@ struct BudgetBar: View {
                 }
             }
             .frame(height: 26)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(budgetBarAccessibilityLabel)
 
             // Legend
             HStack(spacing: 0) {
@@ -219,7 +233,7 @@ struct BudgetBar: View {
                 if pacing.isOverBudget {
                     if let exhaustDate = pacing.projectedBudgetExhaustDate {
                         Text("full by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day())) · ")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.red)
                     }
                 } else {
@@ -265,7 +279,7 @@ struct BudgetBar: View {
                 .frame(width: 8, height: 6)
             }
             Text(label)
-                .font(.system(size: 9))
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
     }
@@ -289,6 +303,8 @@ struct StatusBadge: View {
         .foregroundStyle(color)
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.1)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(statusText)
     }
 
     private var statusText: String {
@@ -337,7 +353,7 @@ struct SupportingMetric: View {
             Text(value)
                 .font(.caption.weight(.semibold))
             Text(label)
-                .font(.system(size: 9))
+                .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
     }
@@ -354,21 +370,21 @@ struct StatChip: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 3) {
                 Image(systemName: icon)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.caption2.weight(.medium))
                 Text(label)
-                    .font(.system(size: 9))
+                    .font(.caption2)
             }
             .foregroundStyle(color.opacity(0.8))
 
             Text(value)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
             if let detail {
                 Text(detail)
-                    .font(.system(size: 9))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

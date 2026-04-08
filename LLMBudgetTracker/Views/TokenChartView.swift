@@ -49,20 +49,30 @@ struct TokenChartView: View {
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: strideCount)) { _ in
                 AxisValueLabel(format: .dateTime.month().day(), centered: true)
-                    .font(.system(size: 9))
+                    .font(.caption2)
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
                     if let v = value.as(Int.self) {
-                        Text(formatCount(v)).font(.system(size: 9))
+                        Text(formatCount(v)).font(.caption2)
                     }
                 }
             }
         }
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 120)
+        .accessibilityLabel(chartAccessibilityLabel)
+        .accessibilityHint("Daily token usage stacked bar chart")
+    }
+
+    private var chartAccessibilityLabel: String {
+        guard !data.isEmpty else { return "No token data available" }
+        let totalPrompt = data.reduce(0) { $0 + $1.metrics.promptTokens }
+        let totalCompletion = data.reduce(0) { $0 + $1.metrics.completionTokens }
+        let totalCache = data.reduce(0) { $0 + $1.metrics.cacheReadInputTokens }
+        return "Token usage over \(data.count) days. Prompt: \(formatCount(totalPrompt)), Completion: \(formatCount(totalCompletion)), Cache read: \(formatCount(totalCache))."
     }
 
     private var strideCount: Int {

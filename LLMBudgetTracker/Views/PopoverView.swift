@@ -25,13 +25,18 @@ struct PopoverView: View {
                                 data: viewModel.dailySpend,
                                 safeLine: viewModel.safeSpendLine
                             )
+                            .transition(.opacity)
                         }
                         if !viewModel.dailyActivity.isEmpty {
                             TokenChartView(data: viewModel.dailyActivity)
+                                .transition(.opacity)
                             RequestsChartView(data: viewModel.dailyActivity)
+                                .transition(.opacity)
                         }
                     }
-                    .padding(14)
+                    .animation(.easeOut(duration: 0.25), value: viewModel.dailySpend.isEmpty)
+                    .animation(.easeOut(duration: 0.25), value: viewModel.dailyActivity.isEmpty)
+                    .padding(16)
                 }
             }
             Divider()
@@ -74,8 +79,9 @@ struct PopoverView: View {
                     .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
+            .accessibilityHint("Opens the settings window")
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
 
@@ -155,6 +161,8 @@ struct PopoverView: View {
                     .font(.caption2.weight(.medium))
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
+                    .accessibilityLabel("Enable Launch at Login")
+                    .accessibilityHint("Starts LLM Budget Tracker automatically when you log in")
                     Spacer()
                 }
                 if let err = autoStartError {
@@ -185,7 +193,7 @@ struct PopoverView: View {
 
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
 }

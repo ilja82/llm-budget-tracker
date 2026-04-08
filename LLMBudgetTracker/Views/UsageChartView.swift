@@ -23,16 +23,16 @@ struct UsageChartView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 9))
+                    .font(.caption2)
                 Text("Optimum daily spend: ")
-                    .font(.system(size: 9))
+                    .font(.caption2)
                 Text(String(format: "$%.2f/day", safe))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.green)
             }
             .foregroundStyle(.green.opacity(0.85))
             Text("Stay at or under this amount per day to finish within budget.")
-                .font(.system(size: 9))
+                .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -87,22 +87,32 @@ struct UsageChartView: View {
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: strideCount)) { _ in
                 AxisValueLabel(format: .dateTime.month().day(), centered: true)
-                    .font(.system(size: 9))
+                    .font(.caption2)
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
-                        Text(String(format: "$%.0f", v)).font(.system(size: 9))
+                        Text(String(format: "$%.0f", v)).font(.caption2)
                     }
                 }
             }
         }
         .frame(height: 120)
+        .accessibilityLabel(chartAccessibilityLabel)
+        .accessibilityHint("Daily spending bar chart")
     }
 
     // MARK: - Helpers
+
+    private var chartAccessibilityLabel: String {
+        guard !data.isEmpty else { return "No daily spend data available" }
+        let total = data.reduce(0.0) { $0 + $1.amount }
+        let peak = data.max(by: { $0.amount < $1.amount })
+        return String(format: "Daily spend over %d days. Total: $%.2f. Peak day: $%.2f.",
+            data.count, total, peak?.amount ?? 0)
+    }
 
     private var currentSafeDailySpend: Double? {
         safeLine.first(where: { Calendar.current.isDateInToday($0.date) })?.amount ?? safeLine.last?.amount
