@@ -3,7 +3,19 @@ import Charts
 
 struct UsageChartView: View {
     let data: [(date: Date, amount: Double)]
-    var safeLine: [(date: Date, amount: Double)] = []
+    let safeLine: [(date: Date, amount: Double)]
+    private let safeLimitByDay: [Date: Double]
+
+    init(data: [(date: Date, amount: Double)], safeLine: [(date: Date, amount: Double)] = []) {
+        self.data = data
+        self.safeLine = safeLine
+        var dict: [Date: Double] = [:]
+        let cal = Calendar.current
+        for point in safeLine {
+            dict[cal.startOfDay(for: point.date)] = point.amount
+        }
+        self.safeLimitByDay = dict
+    }
 
     var body: some View {
         GroupBox {
@@ -115,7 +127,8 @@ struct UsageChartView: View {
     }
 
     private var currentSafeDailySpend: Double? {
-        safeLine.first(where: { Calendar.current.isDateInToday($0.date) })?.amount ?? safeLine.last?.amount
+        let today = Calendar.current.startOfDay(for: Date())
+        return safeLimitByDay[today] ?? safeLine.last?.amount
     }
 
     private var strideCount: Int {
@@ -136,8 +149,7 @@ struct UsageChartView: View {
 
     private func safeLimit(for date: Date?) -> Double? {
         guard let date else { return nil }
-        let day = Calendar.current.startOfDay(for: date)
-        return safeLine.first(where: { Calendar.current.isDate($0.date, inSameDayAs: day) })?.amount
+        return safeLimitByDay[Calendar.current.startOfDay(for: date)]
     }
 }
 

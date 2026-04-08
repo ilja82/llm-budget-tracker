@@ -9,16 +9,19 @@ final class RequestLogger {
     private let key = "devLog.requests"
     private let maxAge: TimeInterval = 86_400 // 24 hours
 
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+
     init() { load() }
 
     func add(_ log: APIRequestLog) {
         pruneOld()
         logs.append(log)
         logs.sort { $0.timestamp > $1.timestamp }
-        save()
+        scheduleSave()
     }
 
     func clear() {
+        saveTask?.cancel()
         logs = []
         UserDefaults.standard.removeObject(forKey: key)
     }
@@ -28,6 +31,15 @@ final class RequestLogger {
     private func pruneOld() {
         let cutoff = Date().addingTimeInterval(-maxAge)
         logs = logs.filter { $0.timestamp > cutoff }
+    }
+
+    private func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, let self else { return }
+            self.save()
+        }
     }
 
     private func load() {

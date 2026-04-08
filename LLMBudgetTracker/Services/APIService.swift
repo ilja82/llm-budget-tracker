@@ -1,6 +1,24 @@
 import Foundation
 
 actor APIService {
+    private nonisolated(unsafe) static let dailyFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private nonisolated(unsafe) static let iso8601WithFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private nonisolated(unsafe) static let iso8601Plain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
     private let session: URLSession
     private let decoder: JSONDecoder
 
@@ -36,8 +54,7 @@ actor APIService {
         guard var components = URLComponents(string: baseURL + "/user/daily/activity") else {
             throw APIError.invalidURL
         }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = Self.dailyFmt
         components.queryItems = [
             URLQueryItem(name: "user_id", value: userId),
             URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),
@@ -79,13 +96,8 @@ actor APIService {
     }
 
     private static func parseDate(_ string: String, container: SingleValueDecodingContainer) throws -> Date {
-        let formatters: [ISO8601DateFormatter] = [
-            { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f }(),
-            { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime]; return f }()
-        ]
-        for formatter in formatters {
-            if let date = formatter.date(from: string) { return date }
-        }
+        if let date = iso8601WithFractional.date(from: string) { return date }
+        if let date = iso8601Plain.date(from: string) { return date }
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot parse date: \(string)")
     }
 }

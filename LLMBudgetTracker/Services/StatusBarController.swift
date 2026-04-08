@@ -76,7 +76,7 @@ final class StatusBarController {
             _ = viewModel.pacingBarNSColor
             _ = viewModel.menuBarTooltip
             _ = viewModel.appState
-            _ = viewModel.dailySpend.count
+            _ = viewModel.spendLogs
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.updateImage()

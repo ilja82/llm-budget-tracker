@@ -72,13 +72,20 @@ final class BudgetViewModel {
         let stored = UserDefaults.standard.integer(forKey: "chartDays")
         return stored > 0 ? stored : 14
     }() {
-        didSet { UserDefaults.standard.set(chartDays, forKey: "chartDays") }
+        didSet {
+            UserDefaults.standard.set(chartDays, forKey: "chartDays")
+            _safeSpendLine = nil
+        }
     }
 
     // MARK: - State
 
-    var budgetInfo: BudgetInfo?
-    var spendLogs: [SpendLog] = []
+    var budgetInfo: BudgetInfo? {
+        didSet { _safeSpendLine = nil }
+    }
+    var spendLogs: [SpendLog] = [] {
+        didSet { _dailySpend = nil; _safeSpendLine = nil }
+    }
     var dailyActivity: [DailySpendData] = []
     var appState: AppLoadState = .loading
     var isLoading = false
@@ -185,15 +192,25 @@ final class BudgetViewModel {
     }
 
     var dailySpend: [(date: Date, amount: Double)] {
+        if let cached = _dailySpend { return cached }
         let grouped = Dictionary(grouping: spendLogs) { log in
             Calendar.current.startOfDay(for: log.startTime)
         }
-        return grouped
+        let computed = grouped
             .map { (date: $0.key, amount: $0.value.reduce(0) { $0 + $1.spend }) }
             .sorted { $0.date < $1.date }
+        _dailySpend = computed
+        return computed
     }
 
     var safeSpendLine: [(date: Date, amount: Double)] {
+        if let cached = _safeSpendLine { return cached }
+        let computed = computeSafeSpendLine()
+        _safeSpendLine = computed
+        return computed
+    }
+
+    private func computeSafeSpendLine() -> [(date: Date, amount: Double)] {
         guard let info = budgetInfo,
               let maxBudget = info.maxBudget,
               maxBudget > 0,
@@ -278,6 +295,16 @@ final class BudgetViewModel {
     let requestLogger = RequestLogger()
     private let api = APIService()
     @ObservationIgnored nonisolated(unsafe) private var timerTask: Task<Void, Never>?
+
+    @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]? = nil
+    @ObservationIgnored private var _safeSpendLine: [(date: Date, amount: Double)]? = nil
+
+    private static let dailyFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+    private static let iso8601Display = ISO8601DateFormatter()
 
     init() { startTimer() }
 
@@ -475,8 +502,7 @@ final class BudgetViewModel {
 
     private func generateFakeDailyActivity(daysPassed: Int, totalSpend: Double) -> [DailySpendData] {
         guard daysPassed > 0 else { return [] }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = Self.dailyFmt
         let weights = (0..<daysPassed).map { _ in Double.random(in: 0.5...1.5) }
         let totalWeight = max(weights.reduce(0, +), 0.0001)
 
@@ -517,8 +543,7 @@ final class BudgetViewModel {
         let startDate = Calendar.current.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
         let endDate = Date()
         let urlStr = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = Self.dailyFmt
         let queryParams: [String: String] = [
             "user_id": info.userId,
             "start_date": fmt.string(from: startDate),
@@ -610,7 +635,7 @@ final class BudgetViewModel {
         }
         fields.append(.init(name: "budget_duration", value: info.budgetDuration ?? "nil"))
         if let reset = info.budgetResetAt {
-            fields.append(.init(name: "budget_reset_at", value: ISO8601DateFormatter().string(from: reset)))
+            fields.append(.init(name: "budget_reset_at", value: Self.iso8601Display.string(from: reset)))
         } else {
             fields.append(.init(name: "budget_reset_at", value: "nil"))
         }
@@ -627,8 +652,7 @@ final class BudgetViewModel {
             .init(name: "total_spend", value: String(format: "$%.4f", total))
         ]
         if let earliest = dates.min(), let latest = dates.max() {
-            let fmt = DateFormatter()
-            fmt.dateFormat = "yyyy-MM-dd"
+            let fmt = Self.dailyFmt
             fields.append(.init(name: "date_range", value: "\(fmt.string(from: earliest)) – \(fmt.string(from: latest))"))
         }
         if !models.isEmpty {

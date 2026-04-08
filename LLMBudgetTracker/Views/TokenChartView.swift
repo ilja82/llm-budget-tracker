@@ -3,6 +3,7 @@ import Charts
 
 struct TokenChartView: View {
     let data: [DailySpendData]
+    private let points: [TokenPoint]
 
     private struct TokenPoint: Identifiable {
         let id: String
@@ -11,10 +12,16 @@ struct TokenChartView: View {
         let tokens: Int
     }
 
-    private var points: [TokenPoint] {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = TimeZone(identifier: "UTC")
+    private static let dateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+
+    init(data: [DailySpendData]) {
+        self.data = data
+        let fmt = TokenChartView.dateFmt
         var result: [TokenPoint] = []
         for d in data.sorted(by: { $0.date < $1.date }) {
             guard let date = fmt.date(from: d.date) else { continue }
@@ -24,7 +31,7 @@ struct TokenChartView: View {
             result.append(.init(id: "\(d.date)-cache_read", date: date, type: "Cache Read", tokens: m.cacheReadInputTokens))
             result.append(.init(id: "\(d.date)-cache_create", date: date, type: "Cache Write", tokens: m.cacheCreationInputTokens))
         }
-        return result
+        self.points = result
     }
 
     var body: some View {
@@ -76,8 +83,7 @@ struct TokenChartView: View {
     }
 
     private var strideCount: Int {
-        let dates = points.map(\.date)
-        guard let earliest = dates.min(), let latest = dates.max() else { return 1 }
+        guard let earliest = points.first?.date, let latest = points.last?.date else { return 1 }
         let spanDays = max(1, Calendar.current.dateComponents([.day], from: earliest, to: latest).day ?? 1)
         return max(1, spanDays / 5)
     }
