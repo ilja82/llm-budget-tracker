@@ -43,7 +43,7 @@ struct SettingsView: View {
 
     private var connectionSection: some View {
         Section {
-            TextField("https://your-litellm-proxy.com", text: $proxyURL)
+            TextField("URL", text: $proxyURL, prompt: Text("https://your-litellm-proxy.com"))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: proxyURL) { _, _ in
                     connectionStatus = .idle
@@ -55,7 +55,7 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
 
-            SecureField("Paste API key", text: $newAPIKey)
+            SecureField("API key", text: $newAPIKey, prompt: Text("Paste your API key"))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: newAPIKey) { _, _ in
                     connectionStatus = .idle
