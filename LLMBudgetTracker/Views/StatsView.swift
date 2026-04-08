@@ -44,7 +44,7 @@ struct StatsView: View {
             )
         case .loaded, .refreshing:
             if let info = viewModel.budgetInfo {
-                BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                BudgetCard(info: info, pacing: viewModel.pacingInfo, displayMode: viewModel.displayMode)
             }
         }
     }
@@ -71,6 +71,7 @@ struct StatsView: View {
 struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
+    let displayMode: MenuBarDisplayMode
 
     private var statusColor: Color {
         guard let p = pacing else {
@@ -96,14 +97,12 @@ struct BudgetCard: View {
                 if let max = info.maxBudget {
                     let remaining = Swift.max(max - info.spend, 0)
                     let percentage = max > 0 ? (remaining / max) * 100 : 0
-                    HStack(alignment: .lastTextBaseline, spacing: 6) {
-                        Text(String(format: "$%.2f", remaining))
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(statusColor)
-                        Text(String(format: "%.0f%%", percentage))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(statusColor.opacity(0.75))
-                    }
+                    let heroText = displayMode == .dollar
+                        ? String(format: "$%.2f", remaining)
+                        : String(format: "%.0f%%", percentage)
+                    Text(heroText)
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundStyle(statusColor)
                     if let resetAt = info.budgetResetAt {
                         let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
                         Text("Resets in \(Swift.max(0, days))d")
