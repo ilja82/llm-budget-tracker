@@ -155,6 +155,7 @@ struct PopoverView: View {
                     .font(.caption2.weight(.medium))
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
+                    Spacer()
                 }
                 if let err = autoStartError {
                     Text(err)
@@ -176,7 +177,7 @@ struct PopoverView: View {
                         isRefreshing = false
                     }
                 } label: {
-                    Label(isRefreshing ? "Refreshing..." : "Refresh", systemImage: "arrow.clockwise")
+                    Label(isRefreshing ? "Refreshing..." : "Refresh now", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.plain)
                 .font(.caption)

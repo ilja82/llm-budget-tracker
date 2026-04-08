@@ -8,7 +8,6 @@ struct UsageChartView: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                chartSummaryRow
                 chartBody
                 if let safe = currentSafeDailySpend {
                     safeSpendCallout(safe)
@@ -17,30 +16,6 @@ struct UsageChartView: View {
         } label: {
             Label("Daily Spend", systemImage: "chart.bar.fill")
                 .font(.caption.weight(.semibold))
-        }
-    }
-
-    // MARK: - Chart Summary
-
-    private var chartSummaryRow: some View {
-        HStack(spacing: 12) {
-            Spacer()
-            trendIndicator
-        }
-    }
-
-    @ViewBuilder
-    private var trendIndicator: some View {
-        if data.count >= 3 {
-            let recent = data.suffix(3).map(\.amount)
-            let delta = (recent.last ?? 0) - (recent.first ?? 0)
-            HStack(spacing: 3) {
-                Image(systemName: delta > 0.001 ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 9, weight: .semibold))
-                Text(delta > 0.001 ? "Rising" : "Falling")
-                    .font(.system(size: 9, weight: .medium))
-            }
-            .foregroundStyle(delta > 0.001 ? .orange : .green)
         }
     }
 
