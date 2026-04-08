@@ -18,9 +18,9 @@ struct SettingsView: View {
         @Bindable var vm = viewModel
         Form {
             connectionSection
+            generalSection
             displaySection(vm: $vm)
             refreshSection(vm: $vm)
-            generalSection
             if devModeUnlocked {
                 advancedSection
             }
@@ -31,6 +31,7 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             proxyURL = viewModel.endpointURL
+            autoStart = AutoStartService.isEnabled
         }
         .sheet(isPresented: $showDevModeSheet) {
             DevModeView()
@@ -157,6 +158,9 @@ struct SettingsView: View {
             }
         } header: {
             Text("General")
+        } footer: {
+            Text("When enabled, LLM Budget Tracker starts automatically so your budget is always visible in the menu bar.")
+                .foregroundStyle(.secondary)
         }
     }
 

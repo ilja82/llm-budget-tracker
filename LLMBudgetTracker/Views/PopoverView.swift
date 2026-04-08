@@ -8,6 +8,7 @@ struct PopoverView: View {
     @State private var isRefreshing = false
     @State private var refreshError: String?
     @State private var autoStartEnabled = AutoStartService.isEnabled
+    @State private var autoStartError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -135,10 +136,32 @@ struct PopoverView: View {
                 }
             }
             if !autoStartEnabled {
-                Text("Tip: Enable \"Launch at Login\" in Settings.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Launch at Login is off.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Button("Enable") {
+                        do {
+                            try AutoStartService.setEnabled(true)
+                            autoStartEnabled = true
+                            autoStartError = nil
+                        } catch {
+                            autoStartError = error.localizedDescription
+                        }
+                    }
+                    .font(.caption2.weight(.medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                }
+                if let err = autoStartError {
+                    Text(err)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             HStack {
                 Button {
