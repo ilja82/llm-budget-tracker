@@ -379,9 +379,10 @@ final class BudgetViewModel {
     @MainActor
     func testConnection(url: String, apiKey: String) async -> ConnectionTestResult {
         guard !url.isEmpty, !apiKey.isEmpty else { return .invalidURL }
-        guard url.hasPrefix("http://") || url.hasPrefix("https://") else { return .invalidURL }
+        guard (try? EndpointSecurity.normalizedBaseURLString(from: url)) != nil else { return .invalidURL }
         do {
-            _ = try await api.fetchBudgetInfo(baseURL: url, apiKey: apiKey)
+            let normalizedURL = try EndpointSecurity.normalizedBaseURLString(from: url)
+            _ = try await api.fetchBudgetInfo(baseURL: normalizedURL, apiKey: apiKey)
             return .connected
         } catch let error as APIError {
             switch error {
@@ -503,7 +504,7 @@ final class BudgetViewModel {
             requestURL: base + endpoint,
             requestMethod: "GET",
             requestHeaders: ["x-litellm-api-key": "[REDACTED]"],
-            requestQueryParams: queryParams,
+            requestQueryParams: sanitizeQueryParams(queryParams),
             statusCode: statusCode,
             responseBody: responseBody,
             errorMessage: errorMessage,
@@ -590,7 +591,7 @@ final class BudgetViewModel {
 
     private func budgetInfoFields(_ info: BudgetInfo) -> [APIRequestLog.ExtractedField] {
         var fields: [APIRequestLog.ExtractedField] = [
-            .init(name: "user_id", value: info.userId),
+            .init(name: "user_id", value: maskIdentifier(info.userId)),
             .init(name: "spend", value: String(format: "$%.4f", info.spend))
         ]
         if let max = info.maxBudget {
@@ -604,7 +605,7 @@ final class BudgetViewModel {
         } else {
             fields.append(.init(name: "budget_reset_at", value: "nil"))
         }
-        fields.append(.init(name: "user_email", value: info.userEmail ?? "nil"))
+        fields.append(.init(name: "user_email", value: info.userEmail == nil ? "nil" : "[REDACTED]"))
         return fields
     }
 
@@ -660,5 +661,18 @@ final class BudgetViewModel {
     private func restartTimer() {
         timerTask?.cancel()
         startTimer()
+    }
+
+    private func sanitizeQueryParams(_ params: [String: String]) -> [String: String] {
+        var sanitized = params
+        if let userId = sanitized["user_id"] {
+            sanitized["user_id"] = maskIdentifier(userId)
+        }
+        return sanitized
+    }
+
+    private func maskIdentifier(_ value: String) -> String {
+        guard value.count > 4 else { return "[REDACTED]" }
+        return String(value.prefix(2)) + "…" + String(value.suffix(2))
     }
 }

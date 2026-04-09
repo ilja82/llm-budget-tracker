@@ -5,16 +5,22 @@ enum KeychainService {
     private static let service = "com.ilja82.lite-budget"
     private static let account = "litellm-api-key"
 
+    private static var baseQuery: [CFString: Any] {
+        [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: service,
+            kSecAttrAccount: account,
+            kSecUseDataProtectionKeychain: true
+        ]
+    }
+
     static func save(_ secret: String) throws {
         guard let data = secret.data(using: .utf8) else {
             throw KeychainError.encodingFailed
         }
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecValueData: data
-        ]
+        var query = baseQuery
+        query[kSecValueData] = data
+        query[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         SecItemDelete(query as CFDictionary)
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
@@ -23,13 +29,9 @@ enum KeychainService {
     }
 
     static func load() throws -> String {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne
-        ]
+        var query = baseQuery
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess,
@@ -41,11 +43,7 @@ enum KeychainService {
     }
 
     static func delete() {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account
-        ]
+        let query = baseQuery
         SecItemDelete(query as CFDictionary)
     }
 

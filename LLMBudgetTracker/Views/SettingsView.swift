@@ -49,8 +49,8 @@ struct SettingsView: View {
                     connectionStatus = .idle
                 }
 
-            if !proxyURL.isEmpty && !proxyURL.hasPrefix("http://") && !proxyURL.hasPrefix("https://") {
-                Text("Enter a valid Proxy URL.")
+            if let validationMessage = proxyURLValidationMessage {
+                Text(validationMessage)
                     .font(.caption)
                     .foregroundStyle(.red)
             }
@@ -226,7 +226,17 @@ struct SettingsView: View {
     }
 
     private var isProxyURLValid: Bool {
-        proxyURL.hasPrefix("http://") || proxyURL.hasPrefix("https://")
+        (try? EndpointSecurity.normalizedBaseURLString(from: proxyURL)) != nil
+    }
+
+    private var proxyURLValidationMessage: String? {
+        guard !proxyURL.isEmpty else { return nil }
+        do {
+            _ = try EndpointSecurity.normalizedBaseURLString(from: proxyURL)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
     }
 
     private var canSave: Bool {
@@ -239,20 +249,23 @@ struct SettingsView: View {
     }
 
     private func performConnectionTest() {
-        guard isProxyURLValid else {
-            connectionStatus = .result("Invalid URL", false)
+        guard let normalizedURL = try? EndpointSecurity.normalizedBaseURLString(from: proxyURL) else {
+            connectionStatus = .result(proxyURLErrorMessage, false)
             return
         }
         connectionStatus = .testing
         Task {
-            let result = await viewModel.testConnection(url: proxyURL, apiKey: newAPIKey)
+            let result = await viewModel.testConnection(url: normalizedURL, apiKey: newAPIKey)
             connectionStatus = .result(result.message, result.isSuccess)
         }
     }
 
     private func saveConnection() {
-        guard !proxyURL.isEmpty, !newAPIKey.isEmpty, isProxyURLValid else { return }
-        viewModel.endpointURL = proxyURL
+        guard !proxyURL.isEmpty,
+              !newAPIKey.isEmpty,
+              let normalizedURL = try? EndpointSecurity.normalizedBaseURLString(from: proxyURL) else { return }
+        viewModel.endpointURL = normalizedURL
+        proxyURL = normalizedURL
         do {
             try KeychainService.save(newAPIKey)
             newAPIKey = ""
@@ -267,6 +280,10 @@ struct SettingsView: View {
         } catch {
             connectionStatus = .result(error.localizedDescription, false)
         }
+    }
+
+    private var proxyURLErrorMessage: String {
+        proxyURLValidationMessage ?? "Enter a valid LiteLLM proxy URL."
     }
 }
 

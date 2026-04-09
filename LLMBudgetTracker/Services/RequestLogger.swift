@@ -8,6 +8,7 @@ final class RequestLogger {
 
     private let key = StorageKeys.DevLog.requests
     private let maxAge: TimeInterval = 86_400 // 24 hours
+    private let maxEntries = 100
 
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
@@ -30,7 +31,12 @@ final class RequestLogger {
 
     private func pruneOld() {
         let cutoff = Date().addingTimeInterval(-maxAge)
-        logs = logs.filter { $0.timestamp > cutoff }
+        logs = logs
+            .filter { $0.timestamp > cutoff }
+            .sorted { $0.timestamp > $1.timestamp }
+        if logs.count > maxEntries {
+            logs = Array(logs.prefix(maxEntries))
+        }
     }
 
     private func scheduleSave() {
@@ -46,7 +52,12 @@ final class RequestLogger {
         guard let data = UserDefaults.standard.data(forKey: key),
               let decoded = try? JSONDecoder().decode([APIRequestLog].self, from: data) else { return }
         let cutoff = Date().addingTimeInterval(-maxAge)
-        logs = decoded.filter { $0.timestamp > cutoff }.sorted { $0.timestamp > $1.timestamp }
+        logs = Array(
+            decoded
+                .filter { $0.timestamp > cutoff }
+                .sorted { $0.timestamp > $1.timestamp }
+                .prefix(maxEntries)
+        )
     }
 
     private func save() {

@@ -6,6 +6,7 @@ actor APIService {
         static let requestTimeoutSeconds: TimeInterval = 15
         static let defaultPage: String = "1"
         static let defaultPageSize: String = "32"
+        static let maximumResponseLogBytes: Int = 4_096
     }
 
     // DateFormatter is not thread-safe: keep as actor-isolated instance property
@@ -33,7 +34,14 @@ actor APIService {
     private let decoder: JSONDecoder
 
     init() {
-        session = URLSession.shared
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = Constants.requestTimeoutSeconds
+        configuration.timeoutIntervalForResource = Constants.requestTimeoutSeconds
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = nil
+        configuration.urlCache = nil
+        configuration.waitsForConnectivity = false
+        session = URLSession(configuration: configuration)
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -50,7 +58,7 @@ actor APIService {
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode
         try validate(response)
-        let rawJSON = String(data: data, encoding: .utf8) ?? ""
+        let rawJSON = sanitizedLogBody(from: data)
         return (try decoder.decode(BudgetInfo.self, from: data), rawJSON, statusCode)
     }
 
@@ -61,7 +69,8 @@ actor APIService {
         startDate: Date,
         endDate: Date
     ) async throws -> ([DailySpendData], String, Int?) {
-        guard var components = URLComponents(string: baseURL + "/user/daily/activity") else {
+        let url = try endpoint(base: baseURL, path: "/user/daily/activity")
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
         }
         let fmt = dailyFmt
@@ -72,12 +81,12 @@ actor APIService {
             URLQueryItem(name: "page", value: Constants.defaultPage),
             URLQueryItem(name: "page_size", value: Constants.defaultPageSize)
         ]
-        guard let url = components.url else { throw APIError.invalidURL }
-        let request = authenticatedRequest(url: url, apiKey: apiKey)
+        guard let requestURL = components.url else { throw APIError.invalidURL }
+        let request = authenticatedRequest(url: requestURL, apiKey: apiKey)
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode
         try validate(response)
-        let rawJSON = String(data: data, encoding: .utf8) ?? ""
+        let rawJSON = sanitizedLogBody(from: data)
         let daily = try decoder.decode(DailyActivityResponse.self, from: data)
         return (daily.results, rawJSON, statusCode)
     }
@@ -85,7 +94,14 @@ actor APIService {
     // MARK: - Helpers
 
     private func endpoint(base: String, path: String) throws -> URL {
-        guard let url = URL(string: base.trimmingCharacters(in: .init(charactersIn: "/")) + path) else {
+        let baseURL = try EndpointSecurity.normalizedBaseURL(from: base)
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            throw APIError.invalidURL
+        }
+        let sanitizedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = "/" + ([basePath, sanitizedPath].filter { !$0.isEmpty }).joined(separator: "/")
+        guard let url = components.url else {
             throw APIError.invalidURL
         }
         return url
@@ -94,6 +110,7 @@ actor APIService {
     private func authenticatedRequest(url: URL, apiKey: String) -> URLRequest {
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: Constants.apiKeyHeaderField)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = Constants.requestTimeoutSeconds
         return request
     }
@@ -109,6 +126,10 @@ actor APIService {
         if let date = iso8601WithFractional.date(from: string) { return date }
         if let date = iso8601Plain.date(from: string) { return date }
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot parse date: \(string)")
+    }
+
+    private func sanitizedLogBody(from data: Data) -> String {
+        ResponseSanitizer.sanitize(data: data, maxLength: Constants.maximumResponseLogBytes)
     }
 }
 
