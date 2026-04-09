@@ -4,49 +4,49 @@ import Observation
 @Observable
 final class DevModeSettings {
 
-    var isEnabled: Bool = UserDefaults.standard.bool(forKey: "devMode.isEnabled") {
-        didSet { UserDefaults.standard.set(isEnabled, forKey: "devMode.isEnabled") }
+    var isEnabled: Bool = UserDefaults.standard.bool(forKey: StorageKeys.DevMode.isEnabled) {
+        didSet { UserDefaults.standard.set(isEnabled, forKey: StorageKeys.DevMode.isEnabled) }
     }
 
     var spend: Double = {
-        let v = UserDefaults.standard.double(forKey: "devMode.spend")
+        let v = UserDefaults.standard.double(forKey: StorageKeys.DevMode.spend)
         return v > 0 ? v : 45.50
     }() {
-        didSet { UserDefaults.standard.set(spend, forKey: "devMode.spend") }
+        didSet { UserDefaults.standard.set(spend, forKey: StorageKeys.DevMode.spend) }
     }
 
     var hasMaxBudget: Bool = {
-        guard UserDefaults.standard.object(forKey: "devMode.hasMaxBudget") != nil else { return true }
-        return UserDefaults.standard.bool(forKey: "devMode.hasMaxBudget")
+        guard UserDefaults.standard.object(forKey: StorageKeys.DevMode.hasMaxBudget) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: StorageKeys.DevMode.hasMaxBudget)
     }() {
-        didSet { UserDefaults.standard.set(hasMaxBudget, forKey: "devMode.hasMaxBudget") }
+        didSet { UserDefaults.standard.set(hasMaxBudget, forKey: StorageKeys.DevMode.hasMaxBudget) }
     }
 
     var maxBudget: Double = {
-        let v = UserDefaults.standard.double(forKey: "devMode.maxBudget")
+        let v = UserDefaults.standard.double(forKey: StorageKeys.DevMode.maxBudget)
         return v > 0 ? v : 100.00
     }() {
-        didSet { UserDefaults.standard.set(maxBudget, forKey: "devMode.maxBudget") }
+        didSet { UserDefaults.standard.set(maxBudget, forKey: StorageKeys.DevMode.maxBudget) }
     }
 
     var hasReset: Bool = {
-        guard UserDefaults.standard.object(forKey: "devMode.hasReset") != nil else { return true }
-        return UserDefaults.standard.bool(forKey: "devMode.hasReset")
+        guard UserDefaults.standard.object(forKey: StorageKeys.DevMode.hasReset) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: StorageKeys.DevMode.hasReset)
     }() {
-        didSet { UserDefaults.standard.set(hasReset, forKey: "devMode.hasReset") }
+        didSet { UserDefaults.standard.set(hasReset, forKey: StorageKeys.DevMode.hasReset) }
     }
 
     var daysRemaining: Int = {
-        let v = UserDefaults.standard.integer(forKey: "devMode.daysRemaining")
+        let v = UserDefaults.standard.integer(forKey: StorageKeys.DevMode.daysRemaining)
         return v > 0 ? v : 12
     }() {
-        didSet { UserDefaults.standard.set(daysRemaining, forKey: "devMode.daysRemaining") }
+        didSet { UserDefaults.standard.set(daysRemaining, forKey: StorageKeys.DevMode.daysRemaining) }
     }
 
     var totalDays: Int = {
-        let v = UserDefaults.standard.integer(forKey: "devMode.totalDays")
+        let v = UserDefaults.standard.integer(forKey: StorageKeys.DevMode.totalDays)
         return v > 0 ? v : 30
     }() {
-        didSet { UserDefaults.standard.set(totalDays, forKey: "devMode.totalDays") }
+        didSet { UserDefaults.standard.set(totalDays, forKey: StorageKeys.DevMode.totalDays) }
     }
 }

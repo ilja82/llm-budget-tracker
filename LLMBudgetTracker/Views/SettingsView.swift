@@ -8,7 +8,7 @@ struct SettingsView: View {
     @State private var autoStart = AutoStartService.isEnabled
     @State private var autoStartError: String?
     @State private var versionTapCount = 0
-    @State private var devModeUnlocked = UserDefaults.standard.bool(forKey: "devMode.unlocked")
+    @State private var devModeUnlocked = UserDefaults.standard.bool(forKey: StorageKeys.DevMode.unlocked)
     @State private var showDevModeSheet = false
 
     private let refreshOptions = [5, 15, 30, 60, 120]
@@ -207,7 +207,7 @@ struct SettingsView: View {
                         if versionTapCount >= 7 {
                             versionTapCount = 0
                             devModeUnlocked.toggle()
-                            UserDefaults.standard.set(devModeUnlocked, forKey: "devMode.unlocked")
+                            UserDefaults.standard.set(devModeUnlocked, forKey: StorageKeys.DevMode.unlocked)
                             if !devModeUnlocked, viewModel.devMode.isEnabled {
                                 viewModel.devMode.isEnabled = false
                                 Task { await viewModel.refresh() }

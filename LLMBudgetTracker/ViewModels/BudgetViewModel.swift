@@ -47,33 +47,33 @@ final class BudgetViewModel {
 
     // MARK: - Persisted Settings
 
-    var endpointURL: String = UserDefaults.standard.string(forKey: "endpointURL") ?? "" {
-        didSet { UserDefaults.standard.set(endpointURL, forKey: "endpointURL") }
+    var endpointURL: String = UserDefaults.standard.string(forKey: StorageKeys.App.endpointURL) ?? "" {
+        didSet { UserDefaults.standard.set(endpointURL, forKey: StorageKeys.App.endpointURL) }
     }
 
     var updateIntervalMinutes: Int = {
-        let stored = UserDefaults.standard.integer(forKey: "updateIntervalMinutes")
+        let stored = UserDefaults.standard.integer(forKey: StorageKeys.App.updateIntervalMinutes)
         return stored > 0 ? stored : 60
     }() {
         didSet {
-            UserDefaults.standard.set(updateIntervalMinutes, forKey: "updateIntervalMinutes")
+            UserDefaults.standard.set(updateIntervalMinutes, forKey: StorageKeys.App.updateIntervalMinutes)
             restartTimer()
         }
     }
 
     var displayMode: MenuBarDisplayMode = {
-        let raw = UserDefaults.standard.string(forKey: "displayMode") ?? ""
+        let raw = UserDefaults.standard.string(forKey: StorageKeys.App.displayMode) ?? ""
         return MenuBarDisplayMode(rawValue: raw) ?? .dollar
     }() {
-        didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: "displayMode") }
+        didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: StorageKeys.App.displayMode) }
     }
 
     var chartDays: Int = {
-        let stored = UserDefaults.standard.integer(forKey: "chartDays")
+        let stored = UserDefaults.standard.integer(forKey: StorageKeys.App.chartDays)
         return stored > 0 ? stored : 14
     }() {
         didSet {
-            UserDefaults.standard.set(chartDays, forKey: "chartDays")
+            UserDefaults.standard.set(chartDays, forKey: StorageKeys.App.chartDays)
             _safeSpendLine = nil
         }
     }
@@ -154,37 +154,9 @@ final class BudgetViewModel {
         ].joined(separator: "\n")
     }
 
-    var pacingBarColor: Color {
-        switch appState {
-        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
-            return Color(nsColor: .systemGray)
-        default:
-            break
-        }
-        switch pacingStatus {
-        case .underPace: return .green
-        case .onTrack: return .green
-        case .nearLimit: return .yellow
-        case .overPace: return .red
-        case .unknown: return Color(nsColor: .systemGray)
-        }
-    }
+    var pacingBarColor: Color { pacingStatus.color }
 
-    var pacingBarNSColor: NSColor {
-        switch appState {
-        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
-            return .systemGray
-        default:
-            break
-        }
-        switch pacingStatus {
-        case .underPace: return .systemGreen
-        case .onTrack: return .systemGreen
-        case .nearLimit: return .systemYellow
-        case .overPace: return .systemRed
-        case .unknown: return .systemGray
-        }
-    }
+    var pacingBarNSColor: NSColor { pacingStatus.nsColor }
 
     var budgetPercentage: Double {
         guard let info = budgetInfo, let max = info.maxBudget, max > 0 else { return 0 }
@@ -429,10 +401,7 @@ final class BudgetViewModel {
     @MainActor
     func resetToInitialState() {
         let defaults = UserDefaults.standard
-        for key in ["endpointURL", "updateIntervalMinutes", "displayMode", "chartDays",
-                    "devMode.isEnabled", "devMode.spend", "devMode.hasMaxBudget", "devMode.maxBudget",
-                    "devMode.hasReset", "devMode.daysRemaining", "devMode.totalDays",
-                    "devMode.unlocked", "devLog.requests"] {
+        for key in StorageKeys.allKeys {
             defaults.removeObject(forKey: key)
         }
         KeychainService.delete()

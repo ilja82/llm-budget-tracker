@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 
 // MARK: - Pacing Status
 
@@ -26,6 +28,28 @@ enum PacingStatus {
         case .nearLimit: return "exclamationmark.triangle.fill"
         case .overPace: return "exclamationmark.circle.fill"
         case .unknown: return "questionmark.circle.fill"
+        }
+    }
+}
+
+// MARK: - PacingStatus + Color
+
+extension PacingStatus {
+    var color: Color {
+        switch self {
+        case .underPace, .onTrack: return .green
+        case .nearLimit:           return .orange
+        case .overPace:            return .red
+        case .unknown:             return Color(nsColor: .systemGray)
+        }
+    }
+
+    var nsColor: NSColor {
+        switch self {
+        case .underPace, .onTrack: return .systemGreen
+        case .nearLimit:           return .systemOrange
+        case .overPace:            return .systemRed
+        case .unknown:             return .systemGray
         }
     }
 }

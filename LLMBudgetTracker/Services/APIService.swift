@@ -1,6 +1,13 @@
 import Foundation
 
 actor APIService {
+    private enum Constants {
+        static let apiKeyHeaderField: String = "x-litellm-api-key"
+        static let requestTimeoutSeconds: TimeInterval = 15
+        static let defaultPage: String = "1"
+        static let defaultPageSize: String = "32"
+    }
+
     // DateFormatter is not thread-safe: keep as actor-isolated instance property
     private let dailyFmt: DateFormatter = {
         let f = DateFormatter()
@@ -62,8 +69,8 @@ actor APIService {
             URLQueryItem(name: "user_id", value: userId),
             URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),
             URLQueryItem(name: "end_date", value: fmt.string(from: endDate)),
-            URLQueryItem(name: "page", value: "1"),
-            URLQueryItem(name: "page_size", value: "32")
+            URLQueryItem(name: "page", value: Constants.defaultPage),
+            URLQueryItem(name: "page_size", value: Constants.defaultPageSize)
         ]
         guard let url = components.url else { throw APIError.invalidURL }
         let request = authenticatedRequest(url: url, apiKey: apiKey)
@@ -86,8 +93,8 @@ actor APIService {
 
     private func authenticatedRequest(url: URL, apiKey: String) -> URLRequest {
         var request = URLRequest(url: url)
-        request.setValue(apiKey, forHTTPHeaderField: "x-litellm-api-key")
-        request.timeoutInterval = 15
+        request.setValue(apiKey, forHTTPHeaderField: Constants.apiKeyHeaderField)
+        request.timeoutInterval = Constants.requestTimeoutSeconds
         return request
     }
 

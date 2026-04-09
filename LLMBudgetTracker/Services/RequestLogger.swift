@@ -6,7 +6,7 @@ import Observation
 final class RequestLogger {
     private(set) var logs: [APIRequestLog] = []
 
-    private let key = "devLog.requests"
+    private let key = StorageKeys.DevLog.requests
     private let maxAge: TimeInterval = 86_400 // 24 hours
 
     @ObservationIgnored private var saveTask: Task<Void, Never>?
