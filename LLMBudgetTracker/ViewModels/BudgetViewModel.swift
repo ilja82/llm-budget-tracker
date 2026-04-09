@@ -78,6 +78,10 @@ final class BudgetViewModel {
         }
     }
 
+    var dailyActivityEnabled: Bool = UserDefaults.standard.bool(forKey: StorageKeys.App.dailyActivityEnabled) {
+        didSet { UserDefaults.standard.set(dailyActivityEnabled, forKey: StorageKeys.App.dailyActivityEnabled) }
+    }
+
     // MARK: - State
 
     private(set) var budgetInfo: BudgetInfo? {
@@ -325,6 +329,17 @@ final class BudgetViewModel {
         }
     }
 
+    @MainActor
+    func setDailyActivityEnabled(_ enabled: Bool) async {
+        guard dailyActivityEnabled != enabled else { return }
+        dailyActivityEnabled = enabled
+        if !enabled {
+            clearDailyActivityData()
+            return
+        }
+        await refresh()
+    }
+
     private func handleBudgetSuccess(
         info: BudgetInfo, rawJSON: String, statusCode: Int?, apiKey: String
     ) async {
@@ -337,14 +352,17 @@ final class BudgetViewModel {
         )
         guard info.maxBudget != nil else {
             budgetInfo = info
-            spendLogs = []
-            dailyActivity = []
+            clearDailyActivityData()
             pacingInfo = nil
             appState = .noBudget
             return
         }
         budgetInfo = info
-        await fetchLogs(apiKey: apiKey, info: info)
+        if dailyActivityEnabled {
+            await fetchLogs(apiKey: apiKey, info: info)
+        } else {
+            clearDailyActivityData()
+        }
         computePacing(from: info)
         lastUpdated = Date()
         appState = .loaded
@@ -412,6 +430,7 @@ final class BudgetViewModel {
         updateIntervalMinutes = 60
         displayMode = .dollar
         chartDays = 14
+        dailyActivityEnabled = false
         devMode.isEnabled = false
         devMode.spend = 45.50
         devMode.hasMaxBudget = true
@@ -446,8 +465,12 @@ final class BudgetViewModel {
             userEmail: "dev@test.local"
         )
         budgetInfo = fakeBudgetInfo
-        dailyActivity = generateFakeDailyActivity(daysPassed: daysPassed, totalSpend: devMode.spend)
-        spendLogs = dailyActivity.compactMap { $0.toSpendLog() }
+        if dailyActivityEnabled {
+            dailyActivity = generateFakeDailyActivity(daysPassed: daysPassed, totalSpend: devMode.spend)
+            spendLogs = dailyActivity.compactMap { $0.toSpendLog() }
+        } else {
+            clearDailyActivityData()
+        }
         computePacing(from: fakeBudgetInfo)
         lastUpdated = Date()
         errorMessage = nil
@@ -514,7 +537,7 @@ final class BudgetViewModel {
 
     private func fetchLogs(apiKey: String, info: BudgetInfo) async {
         guard info.budgetResetAt != nil else {
-            spendLogs = []
+            clearDailyActivityData()
             return
         }
         let startDate = Calendar.current.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
@@ -557,6 +580,11 @@ final class BudgetViewModel {
             spendLogs = []
             dailyActivity = []
         }
+    }
+
+    private func clearDailyActivityData() {
+        spendLogs = []
+        dailyActivity = []
     }
 
     private func computePacing(from info: BudgetInfo) {

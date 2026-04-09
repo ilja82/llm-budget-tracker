@@ -21,6 +21,9 @@ struct PopoverView: View {
                 ScrollView {
                     VStack(spacing: 10) {
                         StatsView()
+                        if !viewModel.dailyActivityEnabled {
+                            dailyActivityHint
+                        }
                         if !viewModel.dailySpend.isEmpty {
                             UsageChartView(
                                 data: viewModel.dailySpend,
@@ -109,6 +112,36 @@ struct PopoverView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity)
+    }
+
+    private var dailyActivityHint: some View {
+        GroupBox {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.xyaxis.line")
+                    .foregroundStyle(.secondary)
+                Text("Daily activity stats are off.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Enable") {
+                    refreshTask?.cancel()
+                    isRefreshing = true
+                    refreshError = nil
+                    refreshTask = Task {
+                        await viewModel.setDailyActivityEnabled(true)
+                        guard !Task.isCancelled else { return }
+                        if let err = viewModel.errorMessage, !err.isEmpty {
+                            refreshError = err
+                        }
+                        isRefreshing = false
+                    }
+                }
+                .font(.caption.weight(.medium))
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                Spacer()
+            }
+            .padding(.vertical, 4)
+        }
     }
 
     private var footer: some View {

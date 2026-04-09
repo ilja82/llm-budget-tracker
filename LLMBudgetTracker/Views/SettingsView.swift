@@ -18,7 +18,8 @@ struct SettingsView: View {
         @Bindable var vm = viewModel
         Form {
             connectionSection
-            generalSection
+            startupSection
+            usageDataSection
             displaySection(vm: $vm)
             refreshSection(vm: $vm)
             if devModeUnlocked {
@@ -138,9 +139,9 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - General Section
+    // MARK: - Startup Section
 
-    private var generalSection: some View {
+    private var startupSection: some View {
         Section {
             Toggle("Launch at Login", isOn: $autoStart)
                 .onChange(of: autoStart) { _, enabled in
@@ -152,14 +153,32 @@ struct SettingsView: View {
                         autoStart = !enabled
                     }
                 }
+            Text("Starts LLM Budget Tracker automatically so your budget is always visible in the menu bar.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             if let err = autoStartError {
                 Text(err).font(.caption).foregroundStyle(.red)
             }
         } header: {
-            Text("General")
-        } footer: {
-            Text("When enabled, LLM Budget Tracker starts automatically so your budget is always visible in the menu bar.")
+            Text("Startup")
+        }
+    }
+
+    // MARK: - Usage Data Section
+
+    private var usageDataSection: some View {
+        Section {
+            Toggle("Show Daily Activity", isOn: Binding(
+                get: { viewModel.dailyActivityEnabled },
+                set: { enabled in
+                    Task { await viewModel.setDailyActivityEnabled(enabled) }
+                }
+            ))
+            Text("Adds daily charts and activity details to the popup.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
+        } header: {
+            Text("Usage Data")
         }
     }
 
