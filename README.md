@@ -55,4 +55,4 @@ In Xcode run `⌘` + `R` to build and run the app.
 
 ## License
 
-Distributed under the MIT License. See [`LICENSE`](/Users/ie/IdeaProjects/llm-budget-tracker/LICENSE) for more information.
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
