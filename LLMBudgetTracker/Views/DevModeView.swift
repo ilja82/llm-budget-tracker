@@ -5,6 +5,7 @@ struct DevModeView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedLog: APIRequestLog?
     @State private var showResetConfirmation = false
+    @State private var refreshTask: Task<Void, Never>?
 
     var body: some View {
         @Bindable var dev = viewModel.devMode
@@ -63,7 +64,7 @@ struct DevModeView: View {
         Section {
             Toggle("Override with Test Data", isOn: dev.isEnabled)
                 .onChange(of: dev.wrappedValue.isEnabled) { _, _ in
-                    Task { await viewModel.refresh() }
+                    scheduleRefresh()
                 }
         } footer: {
             Text("Bypasses all API calls and injects the values below. Disable to return to live data.")
@@ -84,7 +85,7 @@ struct DevModeView: View {
             }
             Toggle("Budget limit", isOn: dev.hasMaxBudget)
                 .onChange(of: dev.wrappedValue.hasMaxBudget) { _, _ in
-                    Task { await viewModel.refresh() }
+                    scheduleRefresh()
                 }
             HStack {
                 Text("Max Budget")
@@ -98,7 +99,7 @@ struct DevModeView: View {
             }
             Toggle("Budget reset", isOn: dev.hasReset)
                 .onChange(of: dev.wrappedValue.hasReset) { _, _ in
-                    Task { await viewModel.refresh() }
+                    scheduleRefresh()
                 }
             HStack {
                 Text("Days Remaining")
@@ -138,6 +139,11 @@ struct DevModeView: View {
             }
             .disabled(!viewModel.devMode.isEnabled)
         }
+    }
+
+    private func scheduleRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task { await viewModel.refresh() }
     }
 
     // MARK: - Reset

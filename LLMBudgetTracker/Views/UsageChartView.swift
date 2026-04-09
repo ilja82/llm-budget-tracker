@@ -160,7 +160,7 @@ struct UsageChartView: View {
     let calendar = Calendar.current
     let today = Date()
     let data: [(date: Date, amount: Double)] = (0..<14).map { i in
-        let date = calendar.date(byAdding: .day, value: -13 + i, to: today)!
+        let date = calendar.date(byAdding: .day, value: -13 + i, to: today) ?? today
         let amount = Double.random(in: 0.001...0.012)
         return (date: date, amount: amount)
     }

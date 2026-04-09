@@ -7,6 +7,7 @@ struct PopoverView: View {
 
     @State private var isRefreshing = false
     @State private var refreshError: String?
+    @State private var refreshTask: Task<Void, Never>?
     @State private var autoStartEnabled = AutoStartService.isEnabled
     @State private var autoStartError: String?
 
@@ -69,7 +70,7 @@ struct PopoverView: View {
             Button {
                 closePopover()
                 NSApp.activate(ignoringOtherApps: true)
-                DispatchQueue.main.async { openSettings() }
+                Task { @MainActor in openSettings() }
             } label: {
                 Label("Settings", systemImage: "gear")
                     .font(.caption.weight(.medium))
@@ -102,7 +103,7 @@ struct PopoverView: View {
             Button("Open Settings") {
                 closePopover()
                 NSApp.activate(ignoringOtherApps: true)
-                DispatchQueue.main.async { openSettings() }
+                Task { @MainActor in openSettings() }
             }
             .buttonStyle(.borderedProminent)
         }
@@ -174,11 +175,12 @@ struct PopoverView: View {
             }
             HStack {
                 Button {
-                    guard !isRefreshing else { return }
+                    refreshTask?.cancel()
                     isRefreshing = true
                     refreshError = nil
-                    Task {
+                    refreshTask = Task {
                         await viewModel.refresh()
+                        guard !Task.isCancelled else { return }
                         if let err = viewModel.errorMessage, !err.isEmpty {
                             refreshError = err
                         }

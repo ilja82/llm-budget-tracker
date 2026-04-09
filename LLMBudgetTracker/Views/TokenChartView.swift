@@ -103,7 +103,7 @@ struct TokenChartView: View {
     let fmt = DateFormatter()
     fmt.dateFormat = "yyyy-MM-dd"
     let data: [DailySpendData] = (0..<14).map { i in
-        let date = calendar.date(byAdding: .day, value: -13 + i, to: today)!
+        let date = calendar.date(byAdding: .day, value: -13 + i, to: today) ?? today
         return DailySpendData(
             date: fmt.string(from: date),
             metrics: SpendMetrics(
