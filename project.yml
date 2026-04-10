@@ -28,6 +28,6 @@ targets:
         INFOPLIST_KEY_NSHumanReadableDescription: "LLM Budget Tracker"
         INFOPLIST_KEY_CFBundleDisplayName: LLM Budget Tracker
         MARKETING_VERSION: "0.0.2"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES

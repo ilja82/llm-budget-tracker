@@ -54,6 +54,11 @@ echo "Preparing release $TAG..."
 # Bump MARKETING_VERSION in project.yml
 sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"$VERSION\"/" project.yml
 
+# Bump CURRENT_PROJECT_VERSION in project.yml
+CURRENT_BUILD=$(grep 'CURRENT_PROJECT_VERSION:' project.yml | sed "s/.*CURRENT_PROJECT_VERSION: \"//;s/\".*//")
+NEXT_BUILD=$((CURRENT_BUILD + 1))
+sed -i '' "s/CURRENT_PROJECT_VERSION: \"[^\"]*\"/CURRENT_PROJECT_VERSION: \"$NEXT_BUILD\"/" project.yml
+
 git add project.yml
 git commit -m "Release $TAG"
 git push origin main
