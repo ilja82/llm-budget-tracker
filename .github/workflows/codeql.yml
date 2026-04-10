@@ -64,14 +64,14 @@ jobs:
         if: matrix.language == 'swift'
         run: |
           set -euo pipefail
-          brew install xcodegen
-          xcodegen --version
+          arch -arm64 brew install xcodegen
+          /opt/homebrew/bin/xcodegen --version
 
       - name: Build Swift app for CodeQL
         if: matrix.language == 'swift'
         run: |
           set -euo pipefail
-          xcodegen generate
+          /opt/homebrew/bin/xcodegen generate
           xcodebuild build \
             -project "${APP_NAME}.xcodeproj" \
             -scheme "$SCHEME" \
