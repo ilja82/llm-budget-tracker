@@ -1,0 +1,112 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SCHEME: LLMBudgetTracker
+  APP_NAME: LLMBudgetTracker
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (unsigned)
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: |
+          set -euo pipefail
+          xcodegen generate
+
+      - name: Build (no signing)
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project "${APP_NAME}.xcodeproj" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_STYLE=Manual \
+            ENABLE_HARDENED_RUNTIME=NO
+
+  lint:
+    name: Lint (SwiftLint)
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install SwiftLint
+        run: |
+          set -euo pipefail
+          brew install swiftlint
+          swiftlint version
+
+      - name: Run SwiftLint
+        run: |
+          set -euo pipefail
+          swiftlint lint --strict --reporter github-actions-logging
+
+  security:
+    name: Secret Scan (Trivy)
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          brew install trivy
+          trivy --version
+
+      - name: Scan for secrets
+        run: |
+          set -euo pipefail
+          trivy fs \
+            --scanners secret \
+            --secret-config .trivy-secret.yml \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --format table \
+            .

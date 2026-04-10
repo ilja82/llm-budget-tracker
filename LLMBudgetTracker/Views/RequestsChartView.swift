@@ -1,5 +1,5 @@
-import SwiftUI
 import Charts
+import SwiftUI
 
 struct RequestsChartView: View {
     let data: [DailySpendData]
@@ -21,13 +21,15 @@ struct RequestsChartView: View {
 
     init(data: [DailySpendData]) {
         self.data = data
-        let fmt = RequestsChartView.dateFmt
+        let fmt = Self.dateFmt
         var result: [RequestPoint] = []
-        for d in data.sorted(by: { $0.date < $1.date }) {
-            guard let date = fmt.date(from: d.date) else { continue }
-            let m = d.metrics
-            result.append(.init(id: "\(d.date)-success", date: date, type: "Success", count: m.successfulRequests))
-            result.append(.init(id: "\(d.date)-failed", date: date, type: "Failed", count: m.failedRequests))
+        for entry in data.sorted(by: { $0.date < $1.date }) {
+            guard let date = fmt.date(from: entry.date) else { continue }
+            let metrics = entry.metrics
+            result.append(.init(
+                id: "\(entry.date)-success", date: date, type: "Success", count: metrics.successfulRequests))
+            result.append(.init(
+                id: "\(entry.date)-failed", date: date, type: "Failed", count: metrics.failedRequests))
         }
         self.points = result
     }
@@ -62,8 +64,8 @@ struct RequestsChartView: View {
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
-                    if let v = value.as(Int.self) {
-                        Text("\(v)").font(.caption2)
+                    if let val = value.as(Int.self) {
+                        Text("\(val)").font(.caption2)
                     }
                 }
             }

@@ -115,9 +115,9 @@ struct PacingInfo {
     var status: PacingStatus {
         guard maxBudget > 0 else { return .unknown }
         let ratio = predictedTotal / maxBudget
-        if ratio <= Thresholds.underPaceMax  { return .underPace }
-        if ratio <= Thresholds.onTrackMax    { return .onTrack }
-        if ratio <= Thresholds.nearLimitMax  { return .nearLimit }
+        if ratio <= Thresholds.underPaceMax { return .underPace }
+        if ratio <= Thresholds.onTrackMax { return .onTrack }
+        if ratio <= Thresholds.nearLimitMax { return .nearLimit }
         return .overPace
     }
 }

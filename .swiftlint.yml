@@ -1,0 +1,98 @@
+included:
+  - LLMBudgetTracker
+
+excluded:
+  - LLMBudgetTracker.xcodeproj
+  - DerivedData
+
+# --- Core rule tuning ---
+
+line_length:
+  warning: 120
+  error: 160
+  ignores_comments: true
+  ignores_urls: true
+
+type_name:
+  min_length: 3
+  max_length: 50
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - id
+    - i
+    - x
+    - y
+    - s
+    - f
+
+# BudgetViewModel follows the single-ViewModel pattern and is intentionally large
+file_length:
+  warning: 800
+  error: 1200
+
+type_body_length:
+  warning: 400
+  error: 800
+
+function_body_length:
+  warning: 60
+  error: 100
+
+# --- Disabled rules ---
+
+disabled_rules:
+  - todo            # active development; TODOs are not CI blockers
+  - trailing_comma  # codebase uses trailing commas in multi-line collections
+
+# --- Opt-in rules ---
+
+opt_in_rules:
+  - array_init
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - enum_case_associated_values_count
+  - explicit_init
+  - extension_access_modifier
+  - fallthrough
+  - fatal_error_message
+  - first_where
+  - flatmap_over_map_reduce
+  - force_unwrapping
+  - identical_operands
+  - implicit_return
+  - joined_default_parameter
+  - last_where
+  - legacy_multiple
+  - modifier_order
+  - operator_usage_whitespace
+  - optional_enum_case_matching
+  - overridden_super_call
+  - prefer_self_in_static_references
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - prohibited_super_call
+  - reduce_into
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_first_last
+  - sorted_imports
+  - toggle_bool
+  - unavailable_function
+  - unneeded_parentheses_in_closure_argument
+  - unowned_variable_capture
+  - untyped_error_in_catch
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+  - weak_delegate
+  - yoda_condition

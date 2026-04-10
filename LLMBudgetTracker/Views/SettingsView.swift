@@ -218,7 +218,8 @@ struct SettingsView: View {
         } footer: {
             HStack {
                 Spacer()
-                Text("LLM Budget Tracker v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
+                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+                Text("LLM Budget Tracker v\(version)")
                     .font(.caption2)
                     .foregroundStyle(devModeUnlocked ? Color.orange.opacity(0.6) : Color.secondary.opacity(0.5))
                     .onTapGesture {

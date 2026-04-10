@@ -18,13 +18,13 @@ actor APIService {
 
     // ISO8601DateFormatter is documented as thread-safe; used from non-isolated
     // dateDecodingStrategy closure so marked nonisolated(unsafe)
-    private nonisolated(unsafe) static let iso8601WithFractional: ISO8601DateFormatter = {
+    nonisolated(unsafe) private static let iso8601WithFractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
 
-    private nonisolated(unsafe) static let iso8601Plain: ISO8601DateFormatter = {
+    nonisolated(unsafe) private static let iso8601Plain: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f
@@ -52,6 +52,7 @@ actor APIService {
 
     // MARK: - Public
 
+    // swiftlint:disable:next large_tuple
     func fetchBudgetInfo(baseURL: String, apiKey: String) async throws -> (BudgetInfo, String, Int?) {
         let url = try endpoint(base: baseURL, path: "/v2/user/info")
         let request = authenticatedRequest(url: url, apiKey: apiKey)
@@ -68,6 +69,7 @@ actor APIService {
         userId: String,
         startDate: Date,
         endDate: Date
+    // swiftlint:disable:next large_tuple
     ) async throws -> ([DailySpendData], String, Int?) {
         let url = try endpoint(base: baseURL, path: "/user/daily/activity")
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {

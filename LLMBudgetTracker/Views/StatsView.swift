@@ -26,7 +26,8 @@ struct StatsView: View {
             case .networkError:
                 errorCard(
                     title: "Server unreachable",
-                    message: "LLM Budget Tracker could not reach your LiteLLM proxy. Check the Proxy URL and your network connection."
+                    message: "LLM Budget Tracker could not reach your LiteLLM proxy." +
+                        " Check the Proxy URL and your network connection."
                 )
             case .invalidData:
                 errorCard(
@@ -80,11 +81,11 @@ struct BudgetCard: View {
     let displayMode: MenuBarDisplayMode
 
     private var statusColor: Color {
-        guard let p = pacing else {
+        guard let pacing else {
             let pct = info.maxBudget.map { info.spend / $0 } ?? 0
             return pct > 0.9 ? .red : pct > 0.75 ? .orange : .green
         }
-        return p.status.color
+        return pacing.status.color
     }
 
     var body: some View {
@@ -103,7 +104,9 @@ struct BudgetCard: View {
                     Text(heroText)
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(statusColor)
-                        .accessibilityLabel(String(format: "Remaining: $%.2f (%.0f%% of $%.2f budget)", remaining, percentage, max))
+                        .accessibilityLabel(String(
+                            format: "Remaining: $%.2f (%.0f%% of $%.2f budget)",
+                            remaining, percentage, max))
                     if let resetAt = info.budgetResetAt {
                         let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
                         Text("Resets in \(Swift.max(0, days))d")
@@ -119,13 +122,13 @@ struct BudgetCard: View {
             .frame(maxWidth: .infinity)
 
             // Unified budget bar
-            if let p = pacing {
-                BudgetBar(pacing: p, statusColor: statusColor)
+            if let pacing {
+                BudgetBar(pacing: pacing, statusColor: statusColor)
             }
 
             // Status badge
-            if let p = pacing {
-                StatusBadge(pacing: p, color: statusColor)
+            if let pacing {
+                StatusBadge(pacing: pacing, color: statusColor)
             }
         }
         .padding(14)
@@ -152,25 +155,25 @@ struct BudgetBar: View {
 
     private var budgetBarAccessibilityLabel: String {
         String(format: "Budget progress: $%.2f spent of $%.2f maximum. Optimum: $%.2f. Projected: $%.2f.",
-            pacing.spend, pacing.maxBudget, pacing.expectedUse, pacing.predictedTotal)
+               pacing.spend, pacing.maxBudget, pacing.expectedUse, pacing.predictedTotal)
     }
 
     var body: some View {
         VStack(spacing: 6) {
             let scale = scale
             Canvas { context, size in
-                let w = size.width
+                let width = size.width
                 let barH: CGFloat = 12
                 let barY: CGFloat = (size.height - barH) / 2
 
                 func xPos(_ value: Double) -> CGFloat {
                     guard scale > 0 else { return 0 }
-                    return CGFloat(min(value / scale, 1.0)) * w
+                    return CGFloat(min(value / scale, 1.0)) * width
                 }
 
                 // Track
                 context.fill(
-                    Path(roundedRect: CGRect(x: 0, y: barY, width: w, height: barH), cornerRadius: 5),
+                    Path(roundedRect: CGRect(x: 0, y: barY, width: width, height: barH), cornerRadius: 5),
                     with: .color(.secondary.opacity(0.15))
                 )
 
@@ -263,12 +266,12 @@ struct BudgetBar: View {
                     .frame(width: 2, height: 10)
             case .triangle:
                 Canvas { ctx, sz in
-                    var p = Path()
-                    p.move(to: CGPoint(x: sz.width / 2, y: 0))
-                    p.addLine(to: CGPoint(x: 0, y: sz.height))
-                    p.addLine(to: CGPoint(x: sz.width, y: sz.height))
-                    p.closeSubpath()
-                    ctx.fill(p, with: .color(.secondary.opacity(0.6)))
+                    var path = Path()
+                    path.move(to: CGPoint(x: sz.width / 2, y: 0))
+                    path.addLine(to: CGPoint(x: 0, y: sz.height))
+                    path.addLine(to: CGPoint(x: sz.width, y: sz.height))
+                    path.closeSubpath()
+                    ctx.fill(path, with: .color(.secondary.opacity(0.6)))
                 }
                 .frame(width: 8, height: 6)
             }
@@ -357,7 +360,7 @@ struct StatChip: View {
     let icon: String
     let label: String
     let value: String
-    var detail: String? = nil
+    var detail: String?
     var color: Color = .secondary
 
     var body: some View {

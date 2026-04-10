@@ -109,11 +109,11 @@ private func progressBarImage(progress: Double, color: NSColor, label: String) -
     return NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
         let barY = (rect.height - barH) / 2
         let barRect = CGRect(x: 0.5, y: barY, width: rect.width - 1, height: barH)
-        let r = barH / 4
+        let radius = barH / 4
 
         // Track
         NSColor.quaternaryLabelColor.setFill()
-        NSBezierPath(roundedRect: barRect, xRadius: r, yRadius: r).fill()
+        NSBezierPath(roundedRect: barRect, xRadius: radius, yRadius: radius).fill()
 
         // Fill
         let fillW = barRect.width * CGFloat(min(1.0, max(0.0, progress)))
@@ -121,11 +121,11 @@ private func progressBarImage(progress: Double, color: NSColor, label: String) -
             var fillRect = barRect
             fillRect.size.width = fillW
             color.withAlphaComponent(0.85).setFill()
-            NSBezierPath(roundedRect: fillRect, xRadius: r, yRadius: r).fill()
+            NSBezierPath(roundedRect: fillRect, xRadius: radius, yRadius: radius).fill()
         }
 
         // Border
-        let border = NSBezierPath(roundedRect: barRect.insetBy(dx: 0.5, dy: 0.5), xRadius: r, yRadius: r)
+        let border = NSBezierPath(roundedRect: barRect.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
         border.lineWidth = 1
         NSColor.secondaryLabelColor.withAlphaComponent(0.5).setStroke()
         border.stroke()

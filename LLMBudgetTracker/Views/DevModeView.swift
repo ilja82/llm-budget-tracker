@@ -30,7 +30,8 @@ struct DevModeView: View {
                     dismiss()
                 }
             } message: {
-                Text("This will erase all settings, the API key, and request logs. The app will return to its initial unconfigured state.")
+                Text("This will erase all settings, the API key, and request logs." +
+                    " The app will return to its initial unconfigured state.")
             }
         }
         .frame(minWidth: 480, idealWidth: 480, maxWidth: 480)
@@ -73,6 +74,7 @@ struct DevModeView: View {
     }
 
     @ViewBuilder
+    // swiftlint:disable:next function_body_length
     private func valuesSection(dev: Bindable<DevModeSettings>) -> some View {
         Section("Test Values") {
             HStack {
@@ -339,7 +341,6 @@ private struct RequestDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-
                     // MARK: Request
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Request")

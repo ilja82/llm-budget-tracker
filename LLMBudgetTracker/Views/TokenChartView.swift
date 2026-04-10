@@ -1,5 +1,5 @@
-import SwiftUI
 import Charts
+import SwiftUI
 
 struct TokenChartView: View {
     let data: [DailySpendData]
@@ -21,15 +21,20 @@ struct TokenChartView: View {
 
     init(data: [DailySpendData]) {
         self.data = data
-        let fmt = TokenChartView.dateFmt
+        let fmt = Self.dateFmt
         var result: [TokenPoint] = []
-        for d in data.sorted(by: { $0.date < $1.date }) {
-            guard let date = fmt.date(from: d.date) else { continue }
-            let m = d.metrics
-            result.append(.init(id: "\(d.date)-prompt", date: date, type: "Prompt", tokens: m.promptTokens))
-            result.append(.init(id: "\(d.date)-completion", date: date, type: "Completion", tokens: m.completionTokens))
-            result.append(.init(id: "\(d.date)-cache_read", date: date, type: "Cache Read", tokens: m.cacheReadInputTokens))
-            result.append(.init(id: "\(d.date)-cache_create", date: date, type: "Cache Write", tokens: m.cacheCreationInputTokens))
+        for entry in data.sorted(by: { $0.date < $1.date }) {
+            guard let date = fmt.date(from: entry.date) else { continue }
+            let metrics = entry.metrics
+            result.append(.init(
+                id: "\(entry.date)-prompt", date: date, type: "Prompt", tokens: metrics.promptTokens))
+            result.append(.init(
+                id: "\(entry.date)-completion", date: date, type: "Completion", tokens: metrics.completionTokens))
+            result.append(.init(
+                id: "\(entry.date)-cache_read", date: date, type: "Cache Read", tokens: metrics.cacheReadInputTokens))
+            result.append(.init(
+                id: "\(entry.date)-cache_create",
+                date: date, type: "Cache Write", tokens: metrics.cacheCreationInputTokens))
         }
         self.points = result
     }
@@ -62,8 +67,8 @@ struct TokenChartView: View {
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
-                    if let v = value.as(Int.self) {
-                        Text(formatCount(v)).font(.caption2)
+                    if let val = value.as(Int.self) {
+                        Text(formatCount(val)).font(.caption2)
                     }
                 }
             }
@@ -79,7 +84,10 @@ struct TokenChartView: View {
         let totalPrompt = data.reduce(0) { $0 + $1.metrics.promptTokens }
         let totalCompletion = data.reduce(0) { $0 + $1.metrics.completionTokens }
         let totalCache = data.reduce(0) { $0 + $1.metrics.cacheReadInputTokens }
-        return "Token usage over \(data.count) days. Prompt: \(formatCount(totalPrompt)), Completion: \(formatCount(totalCompletion)), Cache read: \(formatCount(totalCache))."
+        let summary = "Token usage over \(data.count) days."
+        let parts = "Prompt: \(formatCount(totalPrompt)), Completion: \(formatCount(totalCompletion))," +
+            " Cache read: \(formatCount(totalCache))."
+        return "\(summary) \(parts)"
     }
 
     private var strideCount: Int {
@@ -88,10 +96,10 @@ struct TokenChartView: View {
         return max(1, spanDays / 5)
     }
 
-    private func formatCount(_ n: Int) -> String {
-        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
-        if n >= 1_000 { return String(format: "%.0fK", Double(n) / 1_000) }
-        return "\(n)"
+    private func formatCount(_ count: Int) -> String {
+        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
+        if count >= 1_000 { return String(format: "%.0fK", Double(count) / 1_000) }
+        return "\(count)"
     }
 }
 

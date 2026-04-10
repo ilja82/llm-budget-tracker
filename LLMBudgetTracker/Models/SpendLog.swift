@@ -20,7 +20,14 @@ struct SpendLog: Codable, Identifiable {
         case completionTokens = "completion_tokens"
     }
 
-    init(requestId: String = UUID().uuidString, spend: Double, startTime: Date, model: String? = nil, promptTokens: Int? = nil, completionTokens: Int? = nil) {
+    init(
+        requestId: String = UUID().uuidString,
+        spend: Double,
+        startTime: Date,
+        model: String? = nil,
+        promptTokens: Int? = nil,
+        completionTokens: Int? = nil
+    ) {
         self.requestId = requestId
         self.spend = spend
         self.startTime = startTime
@@ -93,16 +100,16 @@ struct SpendMetrics: Codable {
     }
 
     init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        spend                    = (try? c.decode(Double.self, forKey: .spend)) ?? 0
-        promptTokens             = (try? c.decode(Int.self, forKey: .promptTokens)) ?? 0
-        completionTokens         = (try? c.decode(Int.self, forKey: .completionTokens)) ?? 0
-        cacheReadInputTokens     = (try? c.decode(Int.self, forKey: .cacheReadInputTokens)) ?? 0
-        cacheCreationInputTokens = (try? c.decode(Int.self, forKey: .cacheCreationInputTokens)) ?? 0
-        totalTokens              = (try? c.decode(Int.self, forKey: .totalTokens)) ?? 0
-        successfulRequests       = (try? c.decode(Int.self, forKey: .successfulRequests)) ?? 0
-        failedRequests           = (try? c.decode(Int.self, forKey: .failedRequests)) ?? 0
-        apiRequests              = (try? c.decode(Int.self, forKey: .apiRequests)) ?? 0
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        spend                    = (try? container.decode(Double.self, forKey: .spend)) ?? 0
+        promptTokens             = (try? container.decode(Int.self, forKey: .promptTokens)) ?? 0
+        completionTokens         = (try? container.decode(Int.self, forKey: .completionTokens)) ?? 0
+        cacheReadInputTokens     = (try? container.decode(Int.self, forKey: .cacheReadInputTokens)) ?? 0
+        cacheCreationInputTokens = (try? container.decode(Int.self, forKey: .cacheCreationInputTokens)) ?? 0
+        totalTokens              = (try? container.decode(Int.self, forKey: .totalTokens)) ?? 0
+        successfulRequests       = (try? container.decode(Int.self, forKey: .successfulRequests)) ?? 0
+        failedRequests           = (try? container.decode(Int.self, forKey: .failedRequests)) ?? 0
+        apiRequests              = (try? container.decode(Int.self, forKey: .apiRequests)) ?? 0
     }
 }
 

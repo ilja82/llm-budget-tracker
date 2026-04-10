@@ -1,5 +1,5 @@
-import SwiftUI
 import Charts
+import SwiftUI
 
 struct UsageChartView: View {
     let data: [(date: Date, amount: Double)]
@@ -105,8 +105,8 @@ struct UsageChartView: View {
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
-                    if let v = value.as(Double.self) {
-                        Text(String(format: "$%.0f", v)).font(.caption2)
+                    if let val = value.as(Double.self) {
+                        Text(String(format: "$%.0f", val)).font(.caption2)
                     }
                 }
             }
@@ -123,7 +123,7 @@ struct UsageChartView: View {
         let total = data.reduce(0.0) { $0 + $1.amount }
         let peak = data.max(by: { $0.amount < $1.amount })
         return String(format: "Daily spend over %d days. Total: $%.2f. Peak day: $%.2f.",
-            data.count, total, peak?.amount ?? 0)
+                      data.count, total, peak?.amount ?? 0)
     }
 
     private var currentSafeDailySpend: Double? {

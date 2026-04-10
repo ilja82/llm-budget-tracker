@@ -1,8 +1,8 @@
 import Foundation
 
 enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
-    case dollar = "dollar"
-    case percentage = "percentage"
+    case dollar
+    case percentage
 
     var id: String { rawValue }
 

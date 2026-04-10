@@ -225,7 +225,6 @@ struct PopoverView: View {
                 .buttonStyle(.plain)
                 .font(.caption)
                 .disabled(isRefreshing)
-
             }
         }
         .padding(.horizontal, 16)

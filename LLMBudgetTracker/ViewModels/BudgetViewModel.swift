@@ -43,8 +43,8 @@ enum ConnectionTestResult {
 
 @Observable
 @MainActor
+// swiftlint:disable:next type_body_length
 final class BudgetViewModel {
-
     // MARK: - Persisted Settings
 
     var endpointURL: String = UserDefaults.standard.string(forKey: StorageKeys.App.endpointURL) ?? "" {
@@ -272,8 +272,8 @@ final class BudgetViewModel {
     private let api = APIService()
     @ObservationIgnored private var timerTask: Task<Void, Never>?
 
-    @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]? = nil
-    @ObservationIgnored private var _safeSpendLine: [(date: Date, amount: Double)]? = nil
+    @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]?
+    @ObservationIgnored private var _safeSpendLine: [(date: Date, amount: Double)]?
 
     private static let dailyFmt: DateFormatter = {
         let f = DateFormatter()
@@ -372,8 +372,8 @@ final class BudgetViewModel {
     private func handleRefreshError(_ error: Error) {
         let statusCode: Int? = {
             guard let apiErr = error as? APIError,
-                  case .httpError(let c) = apiErr else { return nil }
-            return c
+                  case .httpError(let code) = apiErr else { return nil }
+            return code
         }()
         logAPIRequest(
             endpoint: "/v2/user/info",
@@ -485,7 +485,9 @@ final class BudgetViewModel {
         return (0..<daysPassed).map { i in
             let daysBack = daysPassed - i - 1
             let date = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-            let spend = totalSpend > 0 ? max(0.001, totalSpend * (weights[i] / totalWeight)) : totalSpend / Double(daysPassed)
+            let spend = totalSpend > 0
+                ? max(0.001, totalSpend * (weights[i] / totalWeight))
+                : totalSpend / Double(daysPassed)
             let prompt = Int.random(in: 500...5000)
             let completion = Int.random(in: 100...1000)
             let cacheRead = Int.random(in: 0...2000)
@@ -572,7 +574,9 @@ final class BudgetViewModel {
             logAPIRequest(
                 endpoint: "/user/daily/activity",
                 queryParams: queryParams,
-                statusCode: (error as? APIError).flatMap { if case .httpError(let c) = $0 { return c } else { return nil } },
+                statusCode: (error as? APIError).flatMap {
+                    if case .httpError(let code) = $0 { return code } else { return nil }
+                },
                 responseBody: "",
                 errorMessage: error.localizedDescription,
                 extractedFields: []
@@ -647,7 +651,8 @@ final class BudgetViewModel {
         ]
         if let earliest = dates.min(), let latest = dates.max() {
             let fmt = Self.dailyFmt
-            fields.append(.init(name: "date_range", value: "\(fmt.string(from: earliest)) – \(fmt.string(from: latest))"))
+            let range = "\(fmt.string(from: earliest)) – \(fmt.string(from: latest))"
+            fields.append(.init(name: "date_range", value: range))
         }
         if !models.isEmpty {
             fields.append(.init(name: "models", value: models))
@@ -665,11 +670,11 @@ final class BudgetViewModel {
         if s == "daily" { return 1 }
         if s == "weekly" { return 7 }
         if s == "monthly" { return 30 }
-        if s.hasSuffix("d"), let n = Int(s.dropLast()) { return max(n, 1) }
-        if s.hasSuffix("s"), let n = Int(s.dropLast()) { return max(1, Int(ceil(Double(n) / 86_400.0))) }
-        if s.hasSuffix("h"), let n = Int(s.dropLast()) { return max(1, Int(ceil(Double(n) / 24.0))) }
-        if s.hasSuffix("m"), let n = Int(s.dropLast()) { return max(1, Int(ceil(Double(n) / 1_440.0))) }
-        if s.hasSuffix("mo"), let n = Int(s.dropLast(2)) { return max(1, n * 30) }
+        if s.hasSuffix("d"), let num = Int(s.dropLast()) { return max(num, 1) }
+        if s.hasSuffix("s"), let num = Int(s.dropLast()) { return max(1, Int(ceil(Double(num) / 86_400.0))) }
+        if s.hasSuffix("h"), let num = Int(s.dropLast()) { return max(1, Int(ceil(Double(num) / 24.0))) }
+        if s.hasSuffix("m"), let num = Int(s.dropLast()) { return max(1, Int(ceil(Double(num) / 1_440.0))) }
+        if s.hasSuffix("mo"), let num = Int(s.dropLast(2)) { return max(1, num * 30) }
         return 30
     }
 

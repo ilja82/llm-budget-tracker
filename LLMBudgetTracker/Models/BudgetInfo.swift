@@ -18,7 +18,14 @@ struct BudgetInfo: Codable {
         case userEmail = "user_email"
     }
 
-    init(userId: String, spend: Double, maxBudget: Double?, budgetDuration: String?, budgetResetAt: Date?, userEmail: String?) {
+    init(
+        userId: String,
+        spend: Double,
+        maxBudget: Double?,
+        budgetDuration: String?,
+        budgetResetAt: Date?,
+        userEmail: String?
+    ) {
         self.userId = userId
         self.spend = spend
         self.maxBudget = maxBudget

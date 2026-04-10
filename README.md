@@ -41,8 +41,8 @@ Click the menu bar item, then open Settings.
 git clone https://github.com/ilja82/llm-budget-tracker.git
 cd llm-budget-tracker
 
-# 2. Install XcodeGen (if not already installed)
-brew install xcodegen
+# 2. Install XcodeGen and additional tools (if not already installed)
+brew install xcodegen swiftlint
 
 # 3. Generate the Xcode project
 xcodegen generate
