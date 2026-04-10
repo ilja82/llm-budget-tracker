@@ -14,6 +14,10 @@ defaults:
   run:
     shell: bash
 
+env:
+  APP_NAME: LLMBudgetTracker
+  SCHEME: LLMBudgetTracker
+
 permissions:
   contents: read
 
@@ -39,7 +43,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -58,17 +64,21 @@ jobs:
         if: matrix.language == 'swift'
         run: |
           set -euo pipefail
-          brew install xcodegen
-          xcodegen --version
+          BREW_BIN="/opt/homebrew/bin/brew"
+          arch -arm64 "$BREW_BIN" install xcodegen
+          XCODEGEN_BIN="$(arch -arm64 "$BREW_BIN" --prefix xcodegen)/bin/xcodegen"
+          arch -arm64 "$XCODEGEN_BIN" --version
 
       - name: Build Swift app for CodeQL
         if: matrix.language == 'swift'
         run: |
           set -euo pipefail
-          xcodegen generate
+          BREW_BIN="/opt/homebrew/bin/brew"
+          XCODEGEN_BIN="$(arch -arm64 "$BREW_BIN" --prefix xcodegen)/bin/xcodegen"
+          arch -arm64 "$XCODEGEN_BIN" generate
           xcodebuild build \
-            -project LLMBudgetTracker.xcodeproj \
-            -scheme LLMBudgetTracker \
+            -project "${APP_NAME}.xcodeproj" \
+            -scheme "$SCHEME" \
             -configuration Debug \
             -destination "platform=macOS" \
             CODE_SIGNING_ALLOWED=NO \
