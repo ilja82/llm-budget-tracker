@@ -64,18 +64,14 @@ jobs:
         if: matrix.language == 'swift'
         run: |
           set -euo pipefail
-          BREW_BIN="/opt/homebrew/bin/brew"
-          arch -arm64 "$BREW_BIN" install xcodegen
-          XCODEGEN_BIN="$(arch -arm64 "$BREW_BIN" --prefix xcodegen)/bin/xcodegen"
-          arch -arm64 "$XCODEGEN_BIN" --version
+          brew install xcodegen
+          xcodegen --version
 
       - name: Build Swift app for CodeQL
         if: matrix.language == 'swift'
         run: |
           set -euo pipefail
-          BREW_BIN="/opt/homebrew/bin/brew"
-          XCODEGEN_BIN="$(arch -arm64 "$BREW_BIN" --prefix xcodegen)/bin/xcodegen"
-          arch -arm64 "$XCODEGEN_BIN" generate
+          xcodegen generate
           xcodebuild build \
             -project "${APP_NAME}.xcodeproj" \
             -scheme "$SCHEME" \
