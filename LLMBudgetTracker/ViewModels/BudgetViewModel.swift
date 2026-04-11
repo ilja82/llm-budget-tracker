@@ -68,14 +68,9 @@ final class BudgetViewModel {
         didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: StorageKeys.App.displayMode) }
     }
 
-    var chartDays: Int = {
-        let stored = UserDefaults.standard.integer(forKey: StorageKeys.App.chartDays)
-        return stored > 0 ? stored : 14
-    }() {
-        didSet {
-            UserDefaults.standard.set(chartDays, forKey: StorageKeys.App.chartDays)
-            _safeSpendLine = nil
-        }
+    var chartDays: Int {
+        let day = Calendar.current.component(.day, from: Date())
+        return max(28, day)
     }
 
     var dailyActivityEnabled: Bool = UserDefaults.standard.bool(forKey: StorageKeys.App.dailyActivityEnabled) {
@@ -199,40 +194,20 @@ final class BudgetViewModel {
         let billingStart = calendar.startOfDay(
             for: calendar.date(byAdding: .day, value: -totalDays, to: resetAt) ?? Date()
         )
-        let chartStart = calendar.startOfDay(
-            for: calendar.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
-        )
-        // Window starts at whichever is later: billing period start or chart window start
-        let windowStart = max(billingStart, chartStart)
-        // Cap the window at today (inclusive) so the chart doesn't extend into future dates
         let windowEnd = calendar.date(byAdding: .day, value: 1, to: today) ?? today
-        let daysInWindow = calendar.dateComponents([.day], from: windowStart, to: windowEnd).day ?? 0
+        let daysInWindow = calendar.dateComponents([.day], from: billingStart, to: windowEnd).day ?? 0
         guard daysInWindow > 0 else { return [] }
 
         let spendByDay = Dictionary(uniqueKeysWithValues: dailySpend.map {
             (calendar.startOfDay(for: $0.date), $0.amount)
         })
 
-        // If the window starts after the billing period start, we don't have spend data
-        // for the days before the window. Estimate that pre-window spend as:
-        //   total billing spend (info.spend) − known spend for in-window past days
-        var cumulativeSpend: Double
-        if chartStart <= billingStart {
-            cumulativeSpend = 0.0
-        } else {
-            let knownWindowPastSpend = spendByDay
-                .filter { $0.key >= windowStart && $0.key < today }
-                .values.reduce(0, +)
-            cumulativeSpend = max(info.spend - knownWindowPastSpend, 0)
-        }
-
+        var cumulativeSpend = 0.0
         var line: [(date: Date, amount: Double)] = []
-
         let billingEnd = calendar.startOfDay(for: resetAt)
 
         for dayOffset in 0..<daysInWindow {
-            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: windowStart) else { continue }
-            // Use days remaining in the full billing period so the optimum is accurate
+            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: billingStart) else { continue }
             let daysRemainingInBillingPeriod = max(
                 calendar.dateComponents([.day], from: date, to: billingEnd).day ?? 1, 1
             )
@@ -282,7 +257,14 @@ final class BudgetViewModel {
     }()
     private static let iso8601Display = ISO8601DateFormatter()
 
-    init() { startTimer() }
+    init() {
+        if dailyActivityEnabled {
+            let cached = loadCachedActivity()
+            dailyActivity = cached
+            spendLogs = cached.compactMap { $0.toSpendLog() }
+        }
+        startTimer()
+    }
 
     deinit { timerTask?.cancel() }
 
@@ -429,7 +411,6 @@ final class BudgetViewModel {
         endpointURL = ""
         updateIntervalMinutes = 60
         displayMode = .dollar
-        chartDays = 14
         dailyActivityEnabled = false
         devMode.isEnabled = false
         devMode.spend = 45.50
@@ -455,7 +436,16 @@ final class BudgetViewModel {
         let totalDays = max(devMode.totalDays, 1)
         let daysRemaining = min(max(devMode.daysRemaining, 0), totalDays)
         let daysPassed = max(totalDays - daysRemaining, 1)
-        let resetAt = Calendar.current.date(byAdding: .day, value: daysRemaining, to: Date()) ?? Date()
+        // Snap resetAt to the 1st of the next calendar month so billingStart
+        // always lands on the 1st of the current month, matching real LiteLLM billing.
+        let calendar = Calendar.current
+        let now = Date()
+        var nextMonthComponents = calendar.dateComponents([.year, .month], from: now)
+        nextMonthComponents.month = (nextMonthComponents.month ?? 1) + 1
+        nextMonthComponents.day = 1
+        let resetAt = calendar.date(from: nextMonthComponents)
+            ?? calendar.date(byAdding: .day, value: daysRemaining, to: now)
+            ?? now
         let fakeBudgetInfo = BudgetInfo(
             userId: "dev-mode",
             spend: devMode.spend,
@@ -466,7 +456,11 @@ final class BudgetViewModel {
         )
         budgetInfo = fakeBudgetInfo
         if dailyActivityEnabled {
-            dailyActivity = generateFakeDailyActivity(daysPassed: daysPassed, totalSpend: devMode.spend)
+            let billingStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
+            let actualDaysPassed = max(1, (calendar.dateComponents([.day], from: billingStart, to: now).day ?? 0) + 1)
+            let totalChartDays = max(28, actualDaysPassed)
+            let scaledSpend = devMode.spend / Double(actualDaysPassed) * Double(totalChartDays)
+            dailyActivity = generateFakeDailyActivity(daysPassed: totalChartDays, totalSpend: scaledSpend)
             spendLogs = dailyActivity.compactMap { $0.toSpendLog() }
         } else {
             clearDailyActivityData()
@@ -542,26 +536,40 @@ final class BudgetViewModel {
             clearDailyActivityData()
             return
         }
-        let startDate = Calendar.current.date(byAdding: .day, value: -chartDays, to: Date()) ?? Date()
-        let endDate = Date()
         let fmt = Self.dailyFmt
+        let today = Date()
+        let cache = loadCachedActivity()
+
+        let startDate: Date
+        if cache.isEmpty {
+            startDate = Calendar.current.date(byAdding: .day, value: -32, to: today) ?? today
+        } else {
+            let lastDateStr = cache.map(\.date).max() ?? ""
+            startDate = fmt.date(from: lastDateStr)
+                ?? Calendar.current.date(byAdding: .day, value: -32, to: today)
+                ?? today
+        }
+
         let queryParams: [String: String] = [
             "user_id": info.userId,
             "start_date": fmt.string(from: startDate),
-            "end_date": fmt.string(from: endDate),
+            "end_date": fmt.string(from: today),
             "page": "1",
-            "page_size": "32"
+            "page_size": "33"
         ]
         do {
-            let (activityData, rawJSON, statusCode) = try await api.fetchDailyActivity(
+            let (fetched, rawJSON, statusCode) = try await api.fetchDailyActivity(
                 baseURL: endpointURL,
                 apiKey: apiKey,
                 userId: info.userId,
                 startDate: startDate,
-                endDate: endDate
+                endDate: today
             )
-            dailyActivity = activityData
-            spendLogs = activityData.compactMap { $0.toSpendLog() }
+
+            let result = mergeAndPersistActivity(cache: cache, fetched: fetched, today: today)
+            dailyActivity = result
+            spendLogs = result.compactMap { $0.toSpendLog() }
+
             logAPIRequest(
                 endpoint: "/user/daily/activity",
                 queryParams: queryParams,
@@ -581,14 +589,45 @@ final class BudgetViewModel {
                 errorMessage: error.localizedDescription,
                 extractedFields: []
             )
-            spendLogs = []
-            dailyActivity = []
+            if dailyActivity.isEmpty {
+                spendLogs = []
+                dailyActivity = []
+            }
         }
+    }
+
+    private func loadCachedActivity() -> [DailySpendData] {
+        guard let data = UserDefaults.standard.data(forKey: StorageKeys.App.dailyActivityCache),
+              let decoded = try? JSONDecoder().decode([DailySpendData].self, from: data) else { return [] }
+        return decoded
+    }
+
+    private func saveCachedActivity(_ items: [DailySpendData]) {
+        if let encoded = try? JSONEncoder().encode(items) {
+            UserDefaults.standard.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
+        }
+    }
+
+    private func mergeAndPersistActivity(
+        cache: [DailySpendData],
+        fetched: [DailySpendData],
+        today: Date
+    ) -> [DailySpendData] {
+        var merged = Dictionary(uniqueKeysWithValues: cache.map { ($0.date, $0) })
+        for entry in fetched { merged[entry.date] = entry }
+        let cutoff = Calendar.current.date(byAdding: .day, value: -62, to: today) ?? today
+        let cutoffStr = Self.dailyFmt.string(from: cutoff)
+        let result = merged.values
+            .filter { $0.date >= cutoffStr }
+            .sorted { $0.date < $1.date }
+        saveCachedActivity(result)
+        return result
     }
 
     private func clearDailyActivityData() {
         spendLogs = []
         dailyActivity = []
+        UserDefaults.standard.removeObject(forKey: StorageKeys.App.dailyActivityCache)
     }
 
     private func computePacing(from info: BudgetInfo) {

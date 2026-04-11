@@ -5,8 +5,8 @@ enum StorageKeys {
         static let endpointURL           = "endpointURL"
         static let updateIntervalMinutes = "updateIntervalMinutes"
         static let displayMode           = "displayMode"
-        static let chartDays             = "chartDays"
         static let dailyActivityEnabled  = "dailyActivityEnabled"
+        static let dailyActivityCache    = "dailyActivity.cache"
     }
 
     enum DevMode {
@@ -26,7 +26,8 @@ enum StorageKeys {
 
     /// All keys that resetToInitialState() must wipe. Add new keys here alongside their definition.
     static let allKeys: [String] = [
-        App.endpointURL, App.updateIntervalMinutes, App.displayMode, App.chartDays, App.dailyActivityEnabled,
+        App.endpointURL, App.updateIntervalMinutes, App.displayMode,
+        App.dailyActivityEnabled, App.dailyActivityCache,
         DevMode.isEnabled, DevMode.spend, DevMode.hasMaxBudget, DevMode.maxBudget,
         DevMode.hasReset, DevMode.daysRemaining, DevMode.totalDays, DevMode.unlocked,
         DevLog.requests,

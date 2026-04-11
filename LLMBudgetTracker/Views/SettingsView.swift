@@ -12,7 +12,6 @@ struct SettingsView: View {
     @State private var showDevModeSheet = false
 
     private let refreshOptions = [5, 15, 30, 60, 120]
-    private let chartDaysOptions = [7, 14, 21, 28]
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -112,12 +111,6 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-            Picker("Charts time range", selection: vm.chartDays) {
-                ForEach(chartDaysOptions, id: \.self) { days in
-                    Text("Last \(days) days").tag(days)
-                }
-            }
-            .pickerStyle(.menu)
         } header: {
             Text("Display")
         }
