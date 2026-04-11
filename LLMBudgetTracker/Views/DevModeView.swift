@@ -65,6 +65,7 @@ struct DevModeView: View {
         Section {
             Toggle("Override with Test Data", isOn: dev.isEnabled)
                 .onChange(of: dev.wrappedValue.isEnabled) { _, _ in
+                    viewModel.clearDailyActivityData()
                     scheduleRefresh()
                 }
         } footer: {

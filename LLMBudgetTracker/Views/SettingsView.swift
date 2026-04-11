@@ -281,6 +281,7 @@ struct SettingsView: View {
         proxyURL = normalizedURL
         do {
             try KeychainService.save(newAPIKey)
+            viewModel.clearDailyActivityData()
             newAPIKey = ""
             connectionStatus = .result("Settings saved", true)
             Task {

@@ -68,11 +68,6 @@ final class BudgetViewModel {
         didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: StorageKeys.App.displayMode) }
     }
 
-    var chartDays: Int {
-        let day = Calendar.current.component(.day, from: Date())
-        return max(28, day)
-    }
-
     var dailyActivityEnabled: Bool = UserDefaults.standard.bool(forKey: StorageKeys.App.dailyActivityEnabled) {
         didSet { UserDefaults.standard.set(dailyActivityEnabled, forKey: StorageKeys.App.dailyActivityEnabled) }
     }
@@ -436,8 +431,9 @@ final class BudgetViewModel {
         let totalDays = max(devMode.totalDays, 1)
         let daysRemaining = min(max(devMode.daysRemaining, 0), totalDays)
         let daysPassed = max(totalDays - daysRemaining, 1)
-        // Snap resetAt to the 1st of the next calendar month so billingStart
-        // always lands on the 1st of the current month, matching real LiteLLM billing.
+        // Snap resetAt to the 1st of the next calendar month. billingStart is derived
+        // separately from the calendar month start (not from budgetDuration), so it
+        // correctly aligns to the 1st regardless of the configured totalDays value.
         let calendar = Calendar.current
         let now = Date()
         var nextMonthComponents = calendar.dateComponents([.year, .month], from: now)
@@ -555,7 +551,7 @@ final class BudgetViewModel {
             "start_date": fmt.string(from: startDate),
             "end_date": fmt.string(from: today),
             "page": "1",
-            "page_size": "33"
+            "page_size": "32"
         ]
         do {
             let (fetched, rawJSON, statusCode) = try await api.fetchDailyActivity(
@@ -613,7 +609,8 @@ final class BudgetViewModel {
         fetched: [DailySpendData],
         today: Date
     ) -> [DailySpendData] {
-        var merged = Dictionary(uniqueKeysWithValues: cache.map { ($0.date, $0) })
+        var merged: [String: DailySpendData] = [:]
+        for entry in cache { merged[entry.date] = entry }
         for entry in fetched { merged[entry.date] = entry }
         let cutoff = Calendar.current.date(byAdding: .day, value: -62, to: today) ?? today
         let cutoffStr = Self.dailyFmt.string(from: cutoff)
@@ -624,7 +621,7 @@ final class BudgetViewModel {
         return result
     }
 
-    private func clearDailyActivityData() {
+    func clearDailyActivityData() {
         spendLogs = []
         dailyActivity = []
         UserDefaults.standard.removeObject(forKey: StorageKeys.App.dailyActivityCache)
