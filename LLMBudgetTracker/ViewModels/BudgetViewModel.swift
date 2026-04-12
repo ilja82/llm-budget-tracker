@@ -248,6 +248,7 @@ final class BudgetViewModel {
     private static let dailyFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
     private static let iso8601Display = ISO8601DateFormatter()
@@ -293,6 +294,7 @@ final class BudgetViewModel {
             isLoading = false
             return
         }
+        guard !isLoading else { return }
         appState = budgetInfo == nil ? .loading : .refreshing
         isLoading = true
         errorMessage = nil
@@ -396,32 +398,26 @@ final class BudgetViewModel {
 
     @MainActor
     func resetToInitialState() {
-        let defaults = UserDefaults.standard
-        for key in StorageKeys.allKeys {
-            defaults.removeObject(forKey: key)
+        requestLogger.clear()
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
         }
         KeychainService.delete()
-        requestLogger.clear()
+        relaunch()
+    }
 
-        endpointURL = ""
-        updateIntervalMinutes = 60
-        displayMode = .dollar
-        dailyActivityEnabled = false
-        devMode.isEnabled = false
-        devMode.spend = 45.50
-        devMode.hasMaxBudget = true
-        devMode.maxBudget = 100.00
-        devMode.hasReset = true
-        devMode.daysRemaining = 12
-        devMode.totalDays = 30
-
-        budgetInfo = nil
-        spendLogs = []
-        dailyActivity = []
-        pacingInfo = nil
-        errorMessage = nil
-        lastUpdated = nil
-        appState = .notConfigured
+    private func relaunch() {
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(
+            at: Bundle.main.bundleURL,
+            configuration: config
+        ) { app, error in
+            guard app != nil, error == nil else { return }
+            DispatchQueue.main.async {
+                NSApplication.shared.terminate(nil)
+            }
+        }
     }
 
     // MARK: - Dev Mode

@@ -13,6 +13,7 @@ actor APIService {
     private let dailyFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 

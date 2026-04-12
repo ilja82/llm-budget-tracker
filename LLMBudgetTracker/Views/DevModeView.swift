@@ -31,7 +31,7 @@ struct DevModeView: View {
                 }
             } message: {
                 Text("This will erase all settings, the API key, and request logs." +
-                    " The app will return to its initial unconfigured state.")
+                    " The app will relaunch automatically.")
             }
         }
         .frame(minWidth: 480, idealWidth: 480, maxWidth: 480)

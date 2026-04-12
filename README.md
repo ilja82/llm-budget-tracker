@@ -18,8 +18,7 @@ LiteLLM proxy and displays daily activity charts.
 Use homebrew to install the app:
 
 ```bash
-brew tap ilja82/tap
-brew install --cask llm-budget-tracker
+brew install --cask ilja82/tap/llm-budget-tracker
 ```
 
 ## Run the app
