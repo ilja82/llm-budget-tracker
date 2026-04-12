@@ -406,8 +406,14 @@ final class BudgetViewModel {
     }
 
     private func relaunch() {
-        NSWorkspace.shared.open(Bundle.main.bundleURL)
-        exit(0)
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(
+            at: Bundle.main.bundleURL,
+            configuration: config
+        ) { _, _ in
+            NSApplication.shared.terminate(nil)
+        }
     }
 
     // MARK: - Dev Mode
