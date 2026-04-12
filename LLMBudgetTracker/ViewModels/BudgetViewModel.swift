@@ -398,6 +398,7 @@ final class BudgetViewModel {
 
     @MainActor
     func resetToInitialState() {
+        requestLogger.clear()
         if let bundleID = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)
         }
@@ -411,8 +412,11 @@ final class BudgetViewModel {
         NSWorkspace.shared.openApplication(
             at: Bundle.main.bundleURL,
             configuration: config
-        ) { _, _ in
-            NSApplication.shared.terminate(nil)
+        ) { app, error in
+            guard app != nil, error == nil else { return }
+            DispatchQueue.main.async {
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 
