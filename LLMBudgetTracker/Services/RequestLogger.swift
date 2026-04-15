@@ -49,12 +49,16 @@ final class RequestLogger {
     }
 
     private func load() {
-        guard let data = EncryptedStore.data(forKey: key) else {
-            if UserDefaults.standard.object(forKey: key) != nil {
-                UserDefaults.standard.removeObject(forKey: key)
-            }
+        let data: Data?
+        do {
+            data = try EncryptedStore.data(forKey: key)
+        } catch EncryptedStoreError.decryptionFailed {
+            EncryptedStore.remove(forKey: key)
+            return
+        } catch {
             return
         }
+        guard let data else { return }
         guard let decoded = try? JSONDecoder().decode([APIRequestLog].self, from: data) else {
             EncryptedStore.remove(forKey: key)
             return

@@ -102,6 +102,8 @@ final class StatusBarController {
             return "Not configured"
         case .authError:
             return "Authentication failed"
+        case .rateLimited:
+            return "Requests paused"
         case .networkError:
             return "Server unreachable"
         case .invalidData:

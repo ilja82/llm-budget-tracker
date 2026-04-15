@@ -5,6 +5,7 @@ enum AppLoadState: Equatable {
     case loading
     case refreshing
     case loaded
+    case rateLimited
     case authError
     case networkError
     case invalidData

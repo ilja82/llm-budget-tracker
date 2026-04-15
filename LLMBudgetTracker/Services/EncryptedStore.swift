@@ -9,21 +9,21 @@ enum EncryptedStore {
     // MARK: - Public
 
     static func set(_ data: Data, forKey key: String) throws {
-        guard let symmetricKey = encryptionKey() else {
-            throw EncryptedStoreError.keyUnavailable
-        }
+        let symmetricKey = try encryptionKey()
         guard let sealed = try? AES.GCM.seal(data, using: symmetricKey).combined else {
             throw EncryptedStoreError.encryptionFailed
         }
         UserDefaults.standard.set(sealed, forKey: key)
     }
 
-    static func data(forKey key: String) -> Data? {
+    static func data(forKey key: String) throws -> Data? {
         guard let stored = UserDefaults.standard.data(forKey: key) else { return nil }
-        guard let symmetricKey = encryptionKey(),
-              let box = try? AES.GCM.SealedBox(combined: stored),
+        guard let symmetricKey = try existingEncryptionKey() else {
+            throw EncryptedStoreError.keyUnavailable
+        }
+        guard let box = try? AES.GCM.SealedBox(combined: stored),
               let plain = try? AES.GCM.open(box, using: symmetricKey) else {
-            return nil
+            throw EncryptedStoreError.decryptionFailed
         }
         return plain
     }
@@ -34,15 +34,22 @@ enum EncryptedStore {
 
     // MARK: - Key management
 
-    private static func encryptionKey() -> SymmetricKey? {
-        if let keyData = loadKey() { return SymmetricKey(data: keyData) }
+    private static func encryptionKey() throws -> SymmetricKey {
+        if let key = try existingEncryptionKey() {
+            return key
+        }
         let key = SymmetricKey(size: .bits256)
         let keyData = key.withUnsafeBytes { Data($0) }
-        guard saveKey(keyData) else { return nil }
+        guard saveKey(keyData) else { throw EncryptedStoreError.keyUnavailable }
         return key
     }
 
-    private static func loadKey() -> Data? {
+    private static func existingEncryptionKey() throws -> SymmetricKey? {
+        guard let keyData = try loadKey() else { return nil }
+        return SymmetricKey(data: keyData)
+    }
+
+    private static func loadKey() throws -> Data? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: keychainService,
@@ -52,8 +59,12 @@ enum EncryptedStore {
             kSecMatchLimit: kSecMatchLimitOne
         ]
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess,
+              let data = result as? Data else {
+            throw EncryptedStoreError.keyUnavailable
+        }
         return data
     }
 
@@ -75,6 +86,7 @@ enum EncryptedStore {
 enum EncryptedStoreError: LocalizedError {
     case keyUnavailable
     case encryptionFailed
+    case decryptionFailed
 
     var errorDescription: String? {
         switch self {
@@ -82,6 +94,8 @@ enum EncryptedStoreError: LocalizedError {
             return "Secure local storage is unavailable on this Mac."
         case .encryptionFailed:
             return "Failed to encrypt local app data."
+        case .decryptionFailed:
+            return "Failed to read local encrypted app data."
         }
     }
 }

@@ -61,7 +61,7 @@ final class BudgetViewModel {
 
     var pacingStatus: PacingStatus {
         switch appState {
-        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
+        case .authError, .networkError, .invalidData, .noBudget, .rateLimited, .unknownError, .notConfigured:
             return .unknown
         default:
             return pacingInfo?.status ?? .unknown
@@ -85,6 +85,8 @@ final class BudgetViewModel {
             return "LLM Budget Tracker — Not configured\nOpen Settings to connect."
         case .authError:
             return "Authentication failed\nCheck your API key in Settings."
+        case .rateLimited:
+            return "Rate limited\n\(rateLimitMessage)"
         case .networkError:
             return "Server unreachable\nCheck your Proxy URL and network."
         case .invalidData:
@@ -116,6 +118,13 @@ final class BudgetViewModel {
     var pacingBarColor: Color { pacingStatus.color }
 
     var pacingBarNSColor: NSColor { pacingStatus.nsColor }
+
+    private var rateLimitMessage: String {
+        if let until = rateLimitedUntil, until > Date() {
+            return "Pausing until \(until.formatted(date: .omitted, time: .shortened))."
+        }
+        return "Too many requests. Try again shortly."
+    }
 
     var budgetPercentage: Double {
         guard let info = budgetInfo, let max = info.maxBudget, max > 0 else { return 0 }
@@ -267,7 +276,8 @@ final class BudgetViewModel {
             return
         }
         if let until = rateLimitedUntil, until > Date() {
-            errorMessage = "Rate limited — pausing until \(until.formatted(date: .omitted, time: .shortened))"
+            appState = .rateLimited
+            errorMessage = rateLimitMessage
             return
         }
         guard !isLoading else { return }
@@ -346,8 +356,10 @@ final class BudgetViewModel {
             switch apiError {
             case .httpError(let code) where code == 401 || code == 403: appState = .authError
             case .httpError(429):
-                rateLimitedUntil = Date().addingTimeInterval(5 * 60); appState = .networkError
-                errorMessage = "Rate limited — pausing requests for 5 minutes"; return
+                rateLimitedUntil = Date().addingTimeInterval(5 * 60)
+                appState = .rateLimited
+                errorMessage = rateLimitMessage
+                return
             case .httpError: appState = .networkError
             case .invalidURL: appState = .networkError
             }
@@ -610,10 +622,16 @@ final class BudgetViewModel {
     }
 
     private func loadCachedActivity() -> [DailySpendData] {
-        guard let data = EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache) else {
+        let data: Data?
+        do {
+            data = try EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache)
+        } catch EncryptedStoreError.decryptionFailed {
             EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
             return []
+        } catch {
+            return []
         }
+        guard let data else { return [] }
         if let envelope = try? JSONDecoder().decode(CachedActivityEnvelope.self, from: data) {
             guard envelope.version == CachedActivityEnvelope.currentVersion else {
                 EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)

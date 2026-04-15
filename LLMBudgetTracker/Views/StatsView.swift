@@ -23,6 +23,23 @@ struct StatsView: View {
                     title: "Authentication failed",
                     message: "Your API key was rejected. Check your API key in Settings."
                 )
+            case .rateLimited:
+                if let info = viewModel.budgetInfo {
+                    VStack(alignment: .leading, spacing: 10) {
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        errorCard(
+                            title: "Requests paused",
+                            message: viewModel.errorMessage ??
+                                "The server asked LLM Budget Tracker to wait before refreshing again."
+                        )
+                    }
+                } else {
+                    errorCard(
+                        title: "Requests paused",
+                        message: viewModel.errorMessage ??
+                            "The server asked LLM Budget Tracker to wait before refreshing again."
+                    )
+                }
             case .networkError:
                 errorCard(
                     title: "Server unreachable",
@@ -266,7 +283,7 @@ struct BudgetBar: View {
                 pacePath.addLine(to: CGPoint(x: paceX, y: barY + barHeight + 5))
                 context.stroke(
                     pacePath,
-                    with: .color(.white.opacity(0.75)),
+                    with: .color(.primary.opacity(0.75)),
                     style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
                 )
 
@@ -300,7 +317,7 @@ struct BudgetBar: View {
                         text: "Spent: \(legendCurrency(pacing.spend))"
                     )
                     barKey(
-                        color: .white.opacity(0.75),
+                        color: .primary.opacity(0.75),
                         text: "Optimum: \(legendCurrency(pacing.expectedUse))",
                         dashed: true
                     )
