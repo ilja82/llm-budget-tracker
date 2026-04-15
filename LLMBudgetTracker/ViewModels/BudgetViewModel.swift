@@ -509,8 +509,10 @@ final class BudgetViewModel {
             } catch is CancellationError {
                 throw CancellationError()
             } catch let error as APIError {
-                if case .httpError(let code) = error, code != 429, (400..<500).contains(code) {
-                    throw error
+                if case .httpError(let code) = error {
+                    if code == 429 || (400..<500).contains(code) {
+                        throw error
+                    }
                 }
                 lastError = error
             } catch {
@@ -625,7 +627,8 @@ final class BudgetViewModel {
         let data: Data?
         do {
             data = try EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache)
-        } catch EncryptedStoreError.decryptionFailed {
+        } catch EncryptedStoreError.decryptionFailed,
+                EncryptedStoreError.keyUnavailable {
             EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
             return []
         } catch {

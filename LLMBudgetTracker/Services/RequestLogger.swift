@@ -52,7 +52,8 @@ final class RequestLogger {
         let data: Data?
         do {
             data = try EncryptedStore.data(forKey: key)
-        } catch EncryptedStoreError.decryptionFailed {
+        } catch EncryptedStoreError.decryptionFailed,
+                EncryptedStoreError.keyUnavailable {
             EncryptedStore.remove(forKey: key)
             return
         } catch {
@@ -78,7 +79,7 @@ final class RequestLogger {
             try EncryptedStore.set(data, forKey: key)
         } catch {
             #if DEBUG
-            print("[RequestLogger] Failed to encode logs: \(error)")
+            print("[RequestLogger] Failed to save logs: \(error)")
             #endif
         }
     }

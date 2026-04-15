@@ -3,7 +3,6 @@ import Foundation
 import Security
 
 enum EncryptedStore {
-    private static let keychainService = "com.ilja82.lite-budget"
     private static let keychainAccount = "encrypted-store-key"
 
     // MARK: - Public
@@ -52,7 +51,7 @@ enum EncryptedStore {
     private static func loadKey() throws -> Data? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: keychainService,
+            kSecAttrService: AppKeychain.service,
             kSecAttrAccount: keychainAccount,
             kSecUseDataProtectionKeychain: true,
             kSecReturnData: true,
@@ -72,7 +71,7 @@ enum EncryptedStore {
     private static func saveKey(_ data: Data) -> Bool {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: keychainService,
+            kSecAttrService: AppKeychain.service,
             kSecAttrAccount: keychainAccount,
             kSecUseDataProtectionKeychain: true,
             kSecValueData: data,
