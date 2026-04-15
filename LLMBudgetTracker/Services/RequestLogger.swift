@@ -65,7 +65,9 @@ final class RequestLogger {
             let data = try JSONEncoder().encode(logs)
             EncryptedStore.set(data, forKey: key)
         } catch {
+            #if DEBUG
             print("[RequestLogger] Failed to encode logs: \(error)")
+            #endif
         }
     }
 }

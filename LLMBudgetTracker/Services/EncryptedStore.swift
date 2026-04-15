@@ -17,6 +17,10 @@ enum EncryptedStore {
     static func set(_ data: Data, forKey key: String) {
         guard let symmetricKey = encryptionKey(),
               let sealed = try? AES.GCM.seal(data, using: symmetricKey).combined else {
+            #if DEBUG
+            print("[EncryptedStore] WARNING: Keychain unavailable — storing '\(key)' as plaintext")
+            #endif
+            assertionFailure("EncryptedStore: Keychain unavailable, data stored unencrypted for key '\(key)'")
             UserDefaults.standard.set(data, forKey: key)
             return
         }

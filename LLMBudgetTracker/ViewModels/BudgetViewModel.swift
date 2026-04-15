@@ -86,6 +86,7 @@ final class BudgetViewModel {
     private(set) var errorMessage: String?
     private(set) var lastUpdated: Date?
     private(set) var pacingInfo: PacingInfo?
+    private var rateLimitedUntil: Date?
 
     var nextRefresh: Date? {
         guard let last = lastUpdated else { return nil }
@@ -294,6 +295,9 @@ final class BudgetViewModel {
             isLoading = false
             return
         }
+        if let until = rateLimitedUntil, until > Date() {
+            errorMessage = "Rate limited — pausing until \(until.formatted(date: .omitted, time: .shortened))"
+            return }
         guard !isLoading else { return }
         appState = budgetInfo == nil ? .loading : .refreshing
         isLoading = true
@@ -324,6 +328,7 @@ final class BudgetViewModel {
     private func handleBudgetSuccess(
         info: BudgetInfo, rawJSON: String, statusCode: Int?, apiKey: String
     ) async {
+        rateLimitedUntil = nil
         logAPIRequest(
             endpoint: "/v2/user/info",
             statusCode: statusCode,
@@ -367,9 +372,8 @@ final class BudgetViewModel {
             switch apiError {
             case .httpError(let code) where code == 401 || code == 403: appState = .authError
             case .httpError(429):
-                appState = .networkError
-                errorMessage = "Rate limited — will retry shortly"
-                return
+                rateLimitedUntil = Date().addingTimeInterval(5 * 60); appState = .networkError
+                errorMessage = "Rate limited — pausing requests for 5 minutes"; return
             case .httpError: appState = .networkError
             case .invalidURL: appState = .networkError
             }
@@ -506,9 +510,7 @@ final class BudgetViewModel {
     // MARK: - Helpers
 
     /// Retries `operation` up to `attempts` times.
-    /// - 4xx errors (except 429) are not retried — they won't self-resolve.
-    /// - 429 uses a longer back-off delay.
-    /// - Task cancellation stops retrying immediately.
+    /// 4xx errors (except 429) are not retried. 429 uses 30 s back-off. Task cancellation stops retrying.
     private func withRetry<T>(
         attempts: Int = 3,
         operation: () async throws -> T
