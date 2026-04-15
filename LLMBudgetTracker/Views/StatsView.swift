@@ -79,11 +79,6 @@ struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
 
-    private let statColumns = [
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10)
-    ]
-
     private var statusColor: Color {
         pacing?.status.color ?? fallbackStatusColor
     }
@@ -120,74 +115,51 @@ struct BudgetCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .top, spacing: 10) {
-                    if let remaining = remainingBudget {
-                        Text(String(format: "$%.2f", remaining))
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .foregroundStyle(statusColor)
-                            .accessibilityLabel(heroAccessibilityLabel(remaining: remaining))
-                    } else {
-                        Text("—")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Remaining")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
+
+                        if let remaining = remainingBudget {
+                            Text(currency(remaining))
+                                .font(.system(size: 42, weight: .heavy, design: .rounded))
+                                .foregroundStyle(statusColor)
+                                .accessibilityLabel(heroAccessibilityLabel(remaining: remaining))
+                        } else {
+                            Text("—")
+                                .font(.system(size: 42, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let resetText {
+                            Text(resetText)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+
+                    Spacer(minLength: 0)
 
                     if let pacing {
-                        StatusPill(
-                            icon: pacing.status.icon,
-                            text: pacing.status.label,
-                            color: statusColor
-                        )
-                        .padding(.top, 6)
+                        VStack(alignment: .trailing, spacing: 4) {
+                            StatusPill(
+                                icon: pacing.status.icon,
+                                text: pacing.status.label,
+                                color: statusColor
+                            )
+                        }
+                    } else if let resetText {
+                        Text(resetText)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
-                }
-
-                Text("Remaining")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                if let resetText {
-                    Text(resetText)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
                 }
             }
 
             if let pacing {
-                Text(pacing.forecastSentence)
-                    .font(.caption)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 BudgetBar(pacing: pacing, statusColor: statusColor)
-
-                LazyVGrid(columns: statColumns, spacing: 10) {
-                    StatCard(
-                        label: "Spent so far",
-                        value: String(format: "$%.2f", pacing.spend),
-                        icon: "chart.bar.fill",
-                        accent: statusColor.opacity(0.9)
-                    )
-                    StatCard(
-                        label: "On-track by today",
-                        value: String(format: "$%.2f", pacing.expectedUse),
-                        icon: "line.diagonal",
-                        accent: .secondary
-                    )
-                    StatCard(
-                        label: "Projected total",
-                        value: String(format: "$%.2f", pacing.predictedTotal),
-                        icon: "scope",
-                        accent: pacing.isOverBudget ? .red : .secondary
-                    )
-                    StatCard(
-                        label: "Budget cap",
-                        value: String(format: "$%.2f", pacing.maxBudget),
-                        icon: "flag.fill",
-                        accent: .secondary
-                    )
-                }
 
                 ActionInsightCard(pacing: pacing, color: statusColor)
             } else if let forecastText = fallbackForecastText {
@@ -220,6 +192,10 @@ struct BudgetCard: View {
             maxBudget
         )
     }
+
+    private func currency(_ value: Double) -> String {
+        String(format: "$%.2f", value)
+    }
 }
 
 // MARK: - Budget Bar
@@ -230,13 +206,6 @@ struct BudgetBar: View {
 
     private var scale: Double {
         max(pacing.maxBudget, pacing.predictedTotal)
-    }
-
-    private var projectedMarkerLabel: String {
-        if pacing.predictedTotal > pacing.maxBudget {
-            return String(format: "Projected total: $%.2f, beyond your budget cap", pacing.predictedTotal)
-        }
-        return String(format: "Projected total: $%.2f", pacing.predictedTotal)
     }
 
     private var budgetBarAccessibilityLabel: String {
@@ -307,7 +276,7 @@ struct BudgetBar: View {
                 projectionPath.addLine(to: CGPoint(x: projectionX, y: barY + barHeight + 4))
                 context.stroke(
                     projectionPath,
-                    with: .color(statusColor.opacity(0.85)),
+                    with: .color(Color.blue.opacity(0.85)),
                     style: StrokeStyle(lineWidth: 2)
                 )
 
@@ -324,11 +293,29 @@ struct BudgetBar: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(budgetBarAccessibilityLabel)
 
-            HStack(spacing: 10) {
-                barKey(color: statusColor, text: "Spent so far")
-                barKey(color: .white.opacity(0.75), text: "On-track by today", dashed: true)
-                barKey(color: statusColor.opacity(0.85), text: projectedMarkerLabel)
-                barKey(color: .primary.opacity(0.7), text: "Budget cap")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    barKey(
+                        color: statusColor,
+                        text: "Spent: \(legendCurrency(pacing.spend))"
+                    )
+                    barKey(
+                        color: .white.opacity(0.75),
+                        text: "Optimum: \(legendCurrency(pacing.expectedUse))",
+                        dashed: true
+                    )
+                    barKey(
+                        color: .primary.opacity(0.7),
+                        text: "Max: \(legendCurrency(pacing.maxBudget))"
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    barKey(
+                        color: Color.blue.opacity(0.85),
+                        text: pacing.forecastSentence
+                    )
+                }
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -355,7 +342,15 @@ struct BudgetBar: View {
             }
             Text(text)
                 .lineLimit(1)
+                .minimumScaleFactor(0.9)
         }
+    }
+
+    private func legendCurrency(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(format: "$%.0f", value)
+        }
+        return String(format: "$%.2f", value)
     }
 }
 
@@ -392,7 +387,7 @@ struct ActionInsightCard: View {
                 Image(systemName: "calendar.badge.clock")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(color)
-                Text(String(format: "Safe daily spend: $%.2f/day", pacing.safeDailySpend))
+                Text(String(format: "Optimum daily spend: $%.2f/day", pacing.safeDailySpend))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
             }
@@ -411,50 +406,17 @@ struct ActionInsightCard: View {
     }
 }
 
-struct StatCard: View {
-    let label: String
-    let value: String
-    let icon: String
-    let accent: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.caption2.weight(.semibold))
-                Text(label)
-                    .font(.caption2)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(.secondary)
-
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(accent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(0.05))
-        )
-    }
-}
-
 // MARK: - Presentation Helpers
 
 private extension PacingInfo {
     var forecastSentence: String {
         switch status {
         case .underPace:
-            return String(format: "At this pace, you'll finish around $%.2f.", predictedTotal)
+            return String(format: "At this pace, you'll finish around: $%.2f.", predictedTotal)
         case .onTrack:
-            return String(format: "You're projected to finish around $%.2f.", predictedTotal)
+            return String(format: "You're projected to finish around: $%.2f.", predictedTotal)
         case .nearLimit:
-            return String(format: "At this pace, you'll finish around $%.2f.", predictedTotal)
+            return String(format: "At this pace, you'll finish around: $%.2f.", predictedTotal)
         case .overPace:
             return "At this pace, you may exceed your budget before reset."
         case .unknown:
