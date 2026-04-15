@@ -13,10 +13,10 @@ enum PacingStatus {
 
     var label: String {
         switch self {
-        case .underPace: return "Under pace"
-        case .onTrack: return "On pace"
+        case .underPace: return "On track"
+        case .onTrack: return "Watch usage"
         case .nearLimit: return "Near limit"
-        case .overPace: return "Over pace"
+        case .overPace: return "Likely to exceed"
         case .unknown: return "Unknown"
         }
     }
@@ -24,7 +24,7 @@ enum PacingStatus {
     var icon: String {
         switch self {
         case .underPace: return "checkmark.circle.fill"
-        case .onTrack: return "minus.circle.fill"
+        case .onTrack: return "eye.circle.fill"
         case .nearLimit: return "exclamationmark.triangle.fill"
         case .overPace: return "exclamationmark.circle.fill"
         case .unknown: return "questionmark.circle.fill"
