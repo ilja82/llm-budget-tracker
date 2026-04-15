@@ -12,6 +12,13 @@ struct SettingsView: View {
     @State private var showDevModeSheet = false
 
     private let refreshOptions = [5, 15, 30, 60, 120]
+    private let diagnosticsEnabledForBuild: Bool = {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }()
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -21,7 +28,7 @@ struct SettingsView: View {
             usageDataSection
             displaySection(vm: $vm)
             refreshSection(vm: $vm)
-            if devModeUnlocked {
+            if diagnosticsEnabledForBuild && devModeUnlocked {
                 advancedSection
             }
             versionFooter
@@ -214,8 +221,13 @@ struct SettingsView: View {
                 let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
                 Text("LLM Budget Tracker v\(version)")
                     .font(.caption2)
-                    .foregroundStyle(devModeUnlocked ? Color.orange.opacity(0.6) : Color.secondary.opacity(0.5))
+                    .foregroundStyle(
+                        diagnosticsEnabledForBuild && devModeUnlocked
+                            ? Color.orange.opacity(0.6)
+                            : Color.secondary.opacity(0.5)
+                    )
                     .onTapGesture {
+                        guard diagnosticsEnabledForBuild else { return }
                         versionTapCount += 1
                         if versionTapCount >= 7 {
                             versionTapCount = 0
@@ -277,10 +289,10 @@ struct SettingsView: View {
         guard !proxyURL.isEmpty,
               !newAPIKey.isEmpty,
               let normalizedURL = try? EndpointSecurity.normalizedBaseURLString(from: proxyURL) else { return }
-        viewModel.endpointURL = normalizedURL
-        proxyURL = normalizedURL
         do {
             try KeychainService.save(newAPIKey)
+            viewModel.endpointURL = normalizedURL
+            proxyURL = normalizedURL
             viewModel.clearDailyActivityData()
             newAPIKey = ""
             connectionStatus = .result("Settings saved", true)

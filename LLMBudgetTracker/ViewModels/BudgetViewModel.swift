@@ -3,42 +3,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-// MARK: - App Load State
-
-enum AppLoadState: Equatable {
-    case notConfigured
-    case loading
-    case refreshing
-    case loaded
-    case authError
-    case networkError
-    case invalidData
-    case noBudget
-    case unknownError
-}
-
-// MARK: - Connection Test Result
-
-enum ConnectionTestResult {
-    case connected
-    case invalidURL
-    case authFailed
-    case serverUnreachable
-    case testFailed
-
-    var message: String {
-        switch self {
-        case .connected: return "Connected"
-        case .invalidURL: return "Invalid URL"
-        case .authFailed: return "Authentication failed"
-        case .serverUnreachable: return "Server unreachable"
-        case .testFailed: return "Connection test failed"
-        }
-    }
-
-    var isSuccess: Bool { self == .connected }
-}
-
 // MARK: - ViewModel
 
 @Observable
@@ -241,6 +205,13 @@ final class BudgetViewModel {
     let devMode = DevModeSettings()
     let requestLogger = RequestLogger()
     private let api = APIService()
+    private let diagnosticLoggingMode: DiagnosticLoggingMode = {
+        #if DEBUG
+        return .full
+        #else
+        return .disabled
+        #endif
+    }()
     @ObservationIgnored private var timerTask: Task<Void, Never>?
 
     @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]?
@@ -548,6 +519,7 @@ final class BudgetViewModel {
         errorMessage: String?,
         extractedFields: [APIRequestLog.ExtractedField]
     ) {
+        guard diagnosticLoggingMode == .full else { return }
         let base = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
         requestLogger.add(APIRequestLog(
             id: UUID(),
@@ -631,14 +603,11 @@ final class BudgetViewModel {
         }
     }
 
-    private struct CachedActivityEnvelope: Codable {
-        static let currentVersion = 1
-        let version: Int
-        let items: [DailySpendData]
-    }
-
     private func loadCachedActivity() -> [DailySpendData] {
-        guard let data = EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache) else { return [] }
+        guard let data = EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache) else {
+            EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
+            return []
+        }
         if let envelope = try? JSONDecoder().decode(CachedActivityEnvelope.self, from: data) {
             guard envelope.version == CachedActivityEnvelope.currentVersion else {
                 EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
@@ -646,14 +615,17 @@ final class BudgetViewModel {
             }
             return envelope.items
         }
-        // Legacy: plain array stored before versioning was introduced
-        return (try? JSONDecoder().decode([DailySpendData].self, from: data)) ?? []
+        EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
+        return []
     }
 
     private func saveCachedActivity(_ items: [DailySpendData]) {
         let envelope = CachedActivityEnvelope(version: CachedActivityEnvelope.currentVersion, items: items)
-        if let encoded = try? JSONEncoder().encode(envelope) {
-            EncryptedStore.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
+        do {
+            let encoded = try JSONEncoder().encode(envelope)
+            try EncryptedStore.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
+        } catch {
+            EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
         }
     }
 

@@ -63,7 +63,7 @@ final class RequestLogger {
     private func save() {
         do {
             let data = try JSONEncoder().encode(logs)
-            EncryptedStore.set(data, forKey: key)
+            try EncryptedStore.set(data, forKey: key)
         } catch {
             #if DEBUG
             print("[RequestLogger] Failed to encode logs: \(error)")
