@@ -17,6 +17,7 @@ targets:
           - "*.entitlements"
     resources:
       - LLMBudgetTracker/Assets.xcassets
+      - LLMBudgetTracker/PrivacyInfo.xcprivacy
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker

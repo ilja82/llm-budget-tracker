@@ -1,14 +1,17 @@
 import Foundation
 import Security
 
+enum AppKeychain {
+    static let service = "com.ilja82.lite-budget"
+}
+
 enum KeychainService {
-    private static let service = "com.ilja82.lite-budget"
     private static let account = "litellm-api-key"
 
     private static var baseQuery: [CFString: Any] {
         [
             kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
+            kSecAttrService: AppKeychain.service,
             kSecAttrAccount: account,
             kSecUseDataProtectionKeychain: true
         ]

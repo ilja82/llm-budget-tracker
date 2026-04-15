@@ -3,42 +3,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-// MARK: - App Load State
-
-enum AppLoadState: Equatable {
-    case notConfigured
-    case loading
-    case refreshing
-    case loaded
-    case authError
-    case networkError
-    case invalidData
-    case noBudget
-    case unknownError
-}
-
-// MARK: - Connection Test Result
-
-enum ConnectionTestResult {
-    case connected
-    case invalidURL
-    case authFailed
-    case serverUnreachable
-    case testFailed
-
-    var message: String {
-        switch self {
-        case .connected: return "Connected"
-        case .invalidURL: return "Invalid URL"
-        case .authFailed: return "Authentication failed"
-        case .serverUnreachable: return "Server unreachable"
-        case .testFailed: return "Connection test failed"
-        }
-    }
-
-    var isSuccess: Bool { self == .connected }
-}
-
 // MARK: - ViewModel
 
 @Observable
@@ -86,6 +50,7 @@ final class BudgetViewModel {
     private(set) var errorMessage: String?
     private(set) var lastUpdated: Date?
     private(set) var pacingInfo: PacingInfo?
+    private var rateLimitedUntil: Date?
 
     var nextRefresh: Date? {
         guard let last = lastUpdated else { return nil }
@@ -96,7 +61,7 @@ final class BudgetViewModel {
 
     var pacingStatus: PacingStatus {
         switch appState {
-        case .authError, .networkError, .invalidData, .noBudget, .unknownError, .notConfigured:
+        case .authError, .networkError, .invalidData, .noBudget, .rateLimited, .unknownError, .notConfigured:
             return .unknown
         default:
             return pacingInfo?.status ?? .unknown
@@ -120,6 +85,8 @@ final class BudgetViewModel {
             return "LLM Budget Tracker — Not configured\nOpen Settings to connect."
         case .authError:
             return "Authentication failed\nCheck your API key in Settings."
+        case .rateLimited:
+            return "Rate limited\n\(rateLimitMessage)"
         case .networkError:
             return "Server unreachable\nCheck your Proxy URL and network."
         case .invalidData:
@@ -151,6 +118,13 @@ final class BudgetViewModel {
     var pacingBarColor: Color { pacingStatus.color }
 
     var pacingBarNSColor: NSColor { pacingStatus.nsColor }
+
+    private var rateLimitMessage: String {
+        if let until = rateLimitedUntil, until > Date() {
+            return "Pausing until \(until.formatted(date: .omitted, time: .shortened))."
+        }
+        return "Too many requests. Try again shortly."
+    }
 
     var budgetPercentage: Double {
         guard let info = budgetInfo, let max = info.maxBudget, max > 0 else { return 0 }
@@ -240,6 +214,13 @@ final class BudgetViewModel {
     let devMode = DevModeSettings()
     let requestLogger = RequestLogger()
     private let api = APIService()
+    private let diagnosticLoggingMode: DiagnosticLoggingMode = {
+        #if DEBUG
+        return .full
+        #else
+        return .disabled
+        #endif
+    }()
     @ObservationIgnored private var timerTask: Task<Void, Never>?
 
     @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]?
@@ -294,6 +275,11 @@ final class BudgetViewModel {
             isLoading = false
             return
         }
+        if let until = rateLimitedUntil, until > Date() {
+            appState = .rateLimited
+            errorMessage = rateLimitMessage
+            return
+        }
         guard !isLoading else { return }
         appState = budgetInfo == nil ? .loading : .refreshing
         isLoading = true
@@ -301,8 +287,12 @@ final class BudgetViewModel {
         defer { isLoading = false }
 
         do {
-            let (info, json, status) = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            let (info, json, status) = try await withRetry {
+                try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            }
             await handleBudgetSuccess(info: info, rawJSON: json, statusCode: status, apiKey: apiKey)
+        } catch is CancellationError {
+            return
         } catch {
             handleRefreshError(error)
         }
@@ -322,6 +312,7 @@ final class BudgetViewModel {
     private func handleBudgetSuccess(
         info: BudgetInfo, rawJSON: String, statusCode: Int?, apiKey: String
     ) async {
+        rateLimitedUntil = nil
         logAPIRequest(
             endpoint: "/v2/user/info",
             statusCode: statusCode,
@@ -364,6 +355,11 @@ final class BudgetViewModel {
         if let apiError = error as? APIError {
             switch apiError {
             case .httpError(let code) where code == 401 || code == 403: appState = .authError
+            case .httpError(429):
+                rateLimitedUntil = Date().addingTimeInterval(5 * 60)
+                appState = .rateLimited
+                errorMessage = rateLimitMessage
+                return
             case .httpError: appState = .networkError
             case .invalidURL: appState = .networkError
             }
@@ -499,6 +495,42 @@ final class BudgetViewModel {
 
     // MARK: - Helpers
 
+    /// Retries `operation` up to `attempts` times.
+    /// 4xx errors (except 429) are not retried. 429 uses 30 s back-off. Task cancellation stops retrying.
+    private func withRetry<T>(
+        attempts: Int = 3,
+        operation: () async throws -> T
+    ) async throws -> T {
+        var lastError: Error = URLError(.unknown)
+        for attempt in 0..<attempts {
+            try Task.checkCancellation()
+            do {
+                return try await operation()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as APIError {
+                if case .httpError(let code) = error {
+                    if code == 429 || (400..<500).contains(code) {
+                        throw error
+                    }
+                }
+                lastError = error
+            } catch {
+                lastError = error
+            }
+            if attempt < attempts - 1 {
+                let delay: Duration = {
+                    if let apiErr = lastError as? APIError,
+                       case .httpError(429) = apiErr { return .seconds(30) }
+                    return .seconds(2)
+                }()
+                try Task.checkCancellation()
+                try await Task.sleep(for: delay)
+            }
+        }
+        throw lastError
+    }
+
     private func logAPIRequest(
         endpoint: String,
         queryParams: [String: String] = [:],
@@ -507,6 +539,7 @@ final class BudgetViewModel {
         errorMessage: String?,
         extractedFields: [APIRequestLog.ExtractedField]
     ) {
+        guard diagnosticLoggingMode == .full else { return }
         let base = endpointURL.trimmingCharacters(in: .init(charactersIn: "/"))
         requestLogger.add(APIRequestLog(
             id: UUID(),
@@ -550,13 +583,15 @@ final class BudgetViewModel {
             "page_size": "32"
         ]
         do {
-            let (fetched, rawJSON, statusCode) = try await api.fetchDailyActivity(
-                baseURL: endpointURL,
-                apiKey: apiKey,
-                userId: info.userId,
-                startDate: startDate,
-                endDate: today
-            )
+            let (fetched, rawJSON, statusCode) = try await withRetry {
+                try await api.fetchDailyActivity(
+                    baseURL: endpointURL,
+                    apiKey: apiKey,
+                    userId: info.userId,
+                    startDate: startDate,
+                    endDate: today
+                )
+            }
 
             let result = mergeAndPersistActivity(cache: cache, fetched: fetched, today: today)
             dailyActivity = result
@@ -589,14 +624,35 @@ final class BudgetViewModel {
     }
 
     private func loadCachedActivity() -> [DailySpendData] {
-        guard let data = UserDefaults.standard.data(forKey: StorageKeys.App.dailyActivityCache),
-              let decoded = try? JSONDecoder().decode([DailySpendData].self, from: data) else { return [] }
-        return decoded
+        let data: Data?
+        do {
+            data = try EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache)
+        } catch EncryptedStoreError.decryptionFailed,
+                EncryptedStoreError.keyUnavailable {
+            EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
+            return []
+        } catch {
+            return []
+        }
+        guard let data else { return [] }
+        if let envelope = try? JSONDecoder().decode(CachedActivityEnvelope.self, from: data) {
+            guard envelope.version == CachedActivityEnvelope.currentVersion else {
+                EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
+                return []
+            }
+            return envelope.items
+        }
+        EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
+        return []
     }
 
     private func saveCachedActivity(_ items: [DailySpendData]) {
-        if let encoded = try? JSONEncoder().encode(items) {
-            UserDefaults.standard.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
+        let envelope = CachedActivityEnvelope(version: CachedActivityEnvelope.currentVersion, items: items)
+        do {
+            let encoded = try JSONEncoder().encode(envelope)
+            try EncryptedStore.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
+        } catch {
+            EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
         }
     }
 
@@ -620,7 +676,7 @@ final class BudgetViewModel {
     func clearDailyActivityData() {
         spendLogs = []
         dailyActivity = []
-        UserDefaults.standard.removeObject(forKey: StorageKeys.App.dailyActivityCache)
+        EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
     }
 
     private func computePacing(from info: BudgetInfo) {

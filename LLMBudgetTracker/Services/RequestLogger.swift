@@ -24,7 +24,7 @@ final class RequestLogger {
     func clear() {
         saveTask?.cancel()
         logs = []
-        UserDefaults.standard.removeObject(forKey: key)
+        EncryptedStore.remove(forKey: key)
     }
 
     // MARK: - Private
@@ -49,8 +49,21 @@ final class RequestLogger {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([APIRequestLog].self, from: data) else { return }
+        let data: Data?
+        do {
+            data = try EncryptedStore.data(forKey: key)
+        } catch EncryptedStoreError.decryptionFailed,
+                EncryptedStoreError.keyUnavailable {
+            EncryptedStore.remove(forKey: key)
+            return
+        } catch {
+            return
+        }
+        guard let data else { return }
+        guard let decoded = try? JSONDecoder().decode([APIRequestLog].self, from: data) else {
+            EncryptedStore.remove(forKey: key)
+            return
+        }
         let cutoff = Date().addingTimeInterval(-maxAge)
         logs = Array(
             decoded
@@ -63,9 +76,11 @@ final class RequestLogger {
     private func save() {
         do {
             let data = try JSONEncoder().encode(logs)
-            UserDefaults.standard.set(data, forKey: key)
+            try EncryptedStore.set(data, forKey: key)
         } catch {
-            print("[RequestLogger] Failed to encode logs: \(error)")
+            #if DEBUG
+            print("[RequestLogger] Failed to save logs: \(error)")
+            #endif
         }
     }
 }

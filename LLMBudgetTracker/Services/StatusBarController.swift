@@ -67,6 +67,9 @@ final class StatusBarController {
         button.image = img
         button.imageScaling = .scaleProportionallyDown
         button.toolTip = viewModel.menuBarTooltip
+        button.setAccessibilityLabel("LLM Budget Tracker")
+        button.setAccessibilityValue(accessibilityValue)
+        button.setAccessibilityHelp("Open budget overview and settings")
     }
 
     private func observeViewModel() {
@@ -91,6 +94,31 @@ final class StatusBarController {
         let fittedHeight = view.fittingSize.height
         let clampedHeight = min(max(fittedHeight, 320), 900)
         popover.contentSize = NSSize(width: 420, height: clampedHeight)
+    }
+
+    private var accessibilityValue: String {
+        switch viewModel.appState {
+        case .notConfigured:
+            return "Not configured"
+        case .authError:
+            return "Authentication failed"
+        case .rateLimited:
+            return "Requests paused"
+        case .networkError:
+            return "Server unreachable"
+        case .invalidData:
+            return "Invalid response data"
+        case .noBudget:
+            return "No budget available"
+        case .unknownError:
+            return "Unknown error"
+        case .loading:
+            return "Loading budget"
+        case .refreshing:
+            return "Refreshing budget"
+        case .loaded:
+            return "Used \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
+        }
     }
 }
 

@@ -21,9 +21,6 @@ struct PopoverView: View {
                 ScrollView {
                     VStack(spacing: 10) {
                         StatsView()
-                        if !viewModel.dailyActivityEnabled {
-                            dailyActivityHint
-                        }
                         if !viewModel.dailySpend.isEmpty {
                             UsageChartView(
                                 data: viewModel.dailySpend,
@@ -37,6 +34,7 @@ struct PopoverView: View {
                             RequestsChartView(data: viewModel.dailyActivity)
                                 .transition(.opacity)
                         }
+                        secondaryControlsSection
                     }
                     .animation(.easeOut(duration: 0.25), value: viewModel.dailySpend.isEmpty)
                     .animation(.easeOut(duration: 0.25), value: viewModel.dailyActivity.isEmpty)
@@ -144,6 +142,63 @@ struct PopoverView: View {
         }
     }
 
+    @ViewBuilder
+    private var secondaryControlsSection: some View {
+        if !viewModel.dailyActivityEnabled || !autoStartEnabled {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("More options")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+
+                if !viewModel.dailyActivityEnabled {
+                    dailyActivityHint
+                }
+
+                if !autoStartEnabled {
+                    launchAtLoginHint
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private var launchAtLoginHint: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Launch at Login is off.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Enable") {
+                        do {
+                            try AutoStartService.setEnabled(true)
+                            autoStartEnabled = true
+                            autoStartError = nil
+                        } catch {
+                            autoStartError = error.localizedDescription
+                        }
+                    }
+                    .font(.caption.weight(.medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityLabel("Enable Launch at Login")
+                    .accessibilityHint("Starts LLM Budget Tracker automatically when you log in")
+                    Spacer()
+                }
+
+                if let err = autoStartError {
+                    Text(err)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
     private var footer: some View {
         VStack(spacing: 4) {
             if let error = refreshError {
@@ -173,37 +228,6 @@ struct PopoverView: View {
                     }
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                }
-            }
-            if !autoStartEnabled {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.up.circle")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text("Launch at Login is off.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Button("Enable") {
-                        do {
-                            try AutoStartService.setEnabled(true)
-                            autoStartEnabled = true
-                            autoStartError = nil
-                        } catch {
-                            autoStartError = error.localizedDescription
-                        }
-                    }
-                    .font(.caption2.weight(.medium))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-                    .accessibilityLabel("Enable Launch at Login")
-                    .accessibilityHint("Starts LLM Budget Tracker automatically when you log in")
-                    Spacer()
-                }
-                if let err = autoStartError {
-                    Text(err)
-                        .font(.caption2)
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             HStack {

@@ -34,8 +34,7 @@ struct DevModeView: View {
                     " The app will relaunch automatically.")
             }
         }
-        .frame(minWidth: 480, idealWidth: 480, maxWidth: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 480, idealWidth: 480, maxWidth: 480, minHeight: 500)
         .sheet(item: $selectedLog) { log in
             RequestDetailView(log: log)
         }

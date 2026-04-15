@@ -19,42 +19,11 @@ struct UsageChartView: View {
 
     var body: some View {
         GroupBox {
-            VStack(alignment: .leading, spacing: 8) {
-                chartBody
-                if let safe = currentSafeDailySpend {
-                    safeSpendCallout(safe)
-                }
-            }
+            chartBody
         } label: {
             Label("Daily Spend", systemImage: "chart.bar.fill")
                 .font(.caption.weight(.semibold))
         }
-    }
-
-    private func safeSpendCallout(_ safe: Double) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption2)
-                Text("Optimum daily spend: ")
-                    .font(.caption2)
-                Text(String(format: "$%.2f/day", safe))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-            }
-            .foregroundStyle(.green.opacity(0.85))
-            Text("Stay at or under this amount per day to finish within budget.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.green.opacity(0.08))
-        )
     }
 
     // MARK: - Chart
@@ -124,11 +93,6 @@ struct UsageChartView: View {
         let peak = data.max(by: { $0.amount < $1.amount })
         return String(format: "Daily spend over %d days. Total: $%.2f. Peak day: $%.2f.",
                       data.count, total, peak?.amount ?? 0)
-    }
-
-    private var currentSafeDailySpend: Double? {
-        let today = Calendar.current.startOfDay(for: Date())
-        return safeLimitByDay[today] ?? safeLine.last?.amount
     }
 
     private var strideCount: Int {

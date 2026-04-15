@@ -23,6 +23,23 @@ struct StatsView: View {
                     title: "Authentication failed",
                     message: "Your API key was rejected. Check your API key in Settings."
                 )
+            case .rateLimited:
+                if let info = viewModel.budgetInfo {
+                    VStack(alignment: .leading, spacing: 10) {
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        errorCard(
+                            title: "Requests paused",
+                            message: viewModel.errorMessage ??
+                                "The server asked LLM Budget Tracker to wait before refreshing again."
+                        )
+                    }
+                } else {
+                    errorCard(
+                        title: "Requests paused",
+                        message: viewModel.errorMessage ??
+                            "The server asked LLM Budget Tracker to wait before refreshing again."
+                    )
+                }
             case .networkError:
                 errorCard(
                     title: "Server unreachable",
@@ -46,7 +63,7 @@ struct StatsView: View {
                 )
             case .loaded, .refreshing:
                 if let info = viewModel.budgetInfo {
-                    BudgetCard(info: info, pacing: viewModel.pacingInfo, displayMode: viewModel.displayMode)
+                    BudgetCard(info: info, pacing: viewModel.pacingInfo)
                 }
             }
         }
@@ -78,68 +95,123 @@ struct StatsView: View {
 struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
-    let displayMode: MenuBarDisplayMode
 
     private var statusColor: Color {
-        guard let pacing else {
-            let pct = info.maxBudget.map { info.spend / $0 } ?? 0
-            return pct > 0.9 ? .red : pct > 0.75 ? .orange : .green
+        pacing?.status.color ?? fallbackStatusColor
+    }
+
+    private var fallbackStatusColor: Color {
+        let pct = info.maxBudget.map { info.spend / $0 } ?? 0
+        return pct > 0.9 ? .red : pct > 0.75 ? .orange : .green
+    }
+
+    private var remainingBudget: Double? {
+        guard let maxBudget = info.maxBudget else { return nil }
+        return Swift.max(maxBudget - info.spend, 0)
+    }
+
+    private var remainingPercentage: Double? {
+        guard let max = info.maxBudget, max > 0, let remainingBudget else { return nil }
+        return (remainingBudget / max) * 100
+    }
+
+    private var resetText: String? {
+        guard let resetAt = info.budgetResetAt else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
+        return "Resets in \(Swift.max(0, days))d"
+    }
+
+    private var fallbackForecastText: String? {
+        guard let maxBudget = info.maxBudget else { return nil }
+        let remaining = Swift.max(maxBudget - info.spend, 0)
+        if remaining <= 0 {
+            return "You have reached your budget cap."
         }
-        return pacing.status.color
+        return String(format: "$%.2f still available before reset.", remaining)
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            // Hero: remaining amount + percentage + reset
-            VStack(spacing: 3) {
-                Text("Remaining")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let max = info.maxBudget {
-                    let remaining = Swift.max(max - info.spend, 0)
-                    let percentage = max > 0 ? (remaining / max) * 100 : 0
-                    let heroText = displayMode == .dollar
-                        ? String(format: "$%.2f", remaining)
-                        : String(format: "%.0f%%", percentage)
-                    Text(heroText)
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(statusColor)
-                        .accessibilityLabel(String(
-                            format: "Remaining: $%.2f (%.0f%% of $%.2f budget)",
-                            remaining, percentage, max))
-                    if let resetAt = info.budgetResetAt {
-                        let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
-                        Text("Resets in \(Swift.max(0, days))d")
-                            .font(.caption2)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Remaining")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
+
+                        if let remaining = remainingBudget {
+                            Text(currency(remaining))
+                                .font(.system(size: 42, weight: .heavy, design: .rounded))
+                                .foregroundStyle(statusColor)
+                                .accessibilityLabel(heroAccessibilityLabel(remaining: remaining))
+                        } else {
+                            Text("—")
+                                .font(.system(size: 42, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let resetText {
+                            Text(resetText)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
-                } else {
-                    Text("—")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+
+                    if let pacing {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            StatusPill(
+                                icon: pacing.status.icon,
+                                text: pacing.status.label,
+                                color: statusColor
+                            )
+                        }
+                    } else if let resetText {
+                        Text(resetText)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity)
 
-            // Unified budget bar
             if let pacing {
                 BudgetBar(pacing: pacing, statusColor: statusColor)
-            }
 
-            // Status badge
-            if let pacing {
-                StatusBadge(pacing: pacing, color: statusColor)
+                ActionInsightCard(pacing: pacing, color: statusColor)
+            } else if let forecastText = fallbackForecastText {
+                Text(forecastText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(statusColor.opacity(0.07))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 14)
                         .strokeBorder(statusColor.opacity(0.18), lineWidth: 1)
                 )
         )
+    }
+
+    private func heroAccessibilityLabel(remaining: Double) -> String {
+        guard let percentage = remainingPercentage, let maxBudget = info.maxBudget else {
+            return String(format: "Remaining budget: $%.2f", remaining)
+        }
+        return String(
+            format: "Remaining budget: $%.2f, %.0f percent of your $%.2f budget",
+            remaining,
+            percentage,
+            maxBudget
+        )
+    }
+
+    private func currency(_ value: Double) -> String {
+        String(format: "$%.2f", value)
     }
 }
 
@@ -150,249 +222,248 @@ struct BudgetBar: View {
     let statusColor: Color
 
     private var scale: Double {
-        pacing.maxBudget * 1.06
+        max(pacing.maxBudget, pacing.predictedTotal)
     }
 
     private var budgetBarAccessibilityLabel: String {
-        String(format: "Budget progress: $%.2f spent of $%.2f maximum. Optimum: $%.2f. Projected: $%.2f.",
-               pacing.spend, pacing.maxBudget, pacing.expectedUse, pacing.predictedTotal)
+        [
+            String(format: "Spent so far: $%.2f.", pacing.spend),
+            String(format: "On-track by today: $%.2f.", pacing.expectedUse),
+            String(format: "Projected total: $%.2f.", pacing.predictedTotal),
+            String(format: "Budget cap: $%.2f.", pacing.maxBudget)
+        ].joined(separator: " ")
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            let scale = scale
+        VStack(alignment: .leading, spacing: 8) {
             Canvas { context, size in
                 let width = size.width
-                let barH: CGFloat = 12
-                let barY: CGFloat = (size.height - barH) / 2
+                let barHeight: CGFloat = 14
+                let barY = (size.height - barHeight) / 2
+                let capWidth: CGFloat = 3
 
-                func xPos(_ value: Double) -> CGFloat {
+                func xPosition(_ value: Double) -> CGFloat {
                     guard scale > 0 else { return 0 }
-                    return CGFloat(min(value / scale, 1.0)) * width
+                    let clamped = min(max(value, 0), scale)
+                    return CGFloat(clamped / scale) * max(width - capWidth, 0)
                 }
 
-                // Track
+                let trackRect = CGRect(x: 0, y: barY, width: max(width - capWidth, 0), height: barHeight)
                 context.fill(
-                    Path(roundedRect: CGRect(x: 0, y: barY, width: width, height: barH), cornerRadius: 5),
-                    with: .color(.secondary.opacity(0.15))
+                    Path(roundedRect: trackRect, cornerRadius: 7),
+                    with: .color(.secondary.opacity(0.14))
                 )
 
-                // Spent fill
-                let spendW = max(6, xPos(pacing.spend))
+                let spendWidth = max(8, xPosition(pacing.spend))
                 context.fill(
-                    Path(roundedRect: CGRect(x: 0, y: barY, width: spendW, height: barH), cornerRadius: 5),
+                    Path(roundedRect: CGRect(x: 0, y: barY, width: spendWidth, height: barHeight), cornerRadius: 7),
                     with: .color(statusColor)
                 )
 
-                // Max budget marker (solid vertical line)
-                let maxX = xPos(pacing.maxBudget)
-                var maxPath = Path()
-                maxPath.move(to: CGPoint(x: maxX, y: barY - 4))
-                maxPath.addLine(to: CGPoint(x: maxX, y: barY + barH + 4))
-                context.stroke(maxPath, with: .color(.primary.opacity(0.55)), lineWidth: 2)
-
-                // Optimum marker (dashed vertical line)
-                let optX = xPos(pacing.expectedUse)
-                var dashY = barY - 4
-                let dashEnd = barY + barH + 4
-                while dashY < dashEnd {
-                    var dp = Path()
-                    dp.move(to: CGPoint(x: optX, y: dashY))
-                    dp.addLine(to: CGPoint(x: optX, y: min(dashY + 3, dashEnd)))
-                    context.stroke(dp, with: .color(.primary.opacity(0.4)), lineWidth: 1.5)
-                    dashY += 5
+                let projectionStart = xPosition(pacing.spend)
+                let projectionEnd = xPosition(pacing.predictedTotal)
+                if projectionEnd > projectionStart {
+                    context.fill(
+                        Path(
+                            roundedRect: CGRect(
+                                x: projectionStart,
+                                y: barY,
+                                width: projectionEnd - projectionStart,
+                                height: barHeight
+                            ),
+                            cornerRadius: 7
+                        ),
+                        with: .color(statusColor.opacity(0.22))
+                    )
                 }
 
-                // Projected total marker (upward triangle below bar)
-                if !pacing.isOverBudget {
-                    let projX = xPos(pacing.predictedTotal)
-                    let triTip = barY + barH + 3
-                    let triBase = triTip + 5
-                    let triHalfW: CGFloat = 4
-                    var projPath = Path()
-                    projPath.move(to: CGPoint(x: projX, y: triTip))
-                    projPath.addLine(to: CGPoint(x: projX - triHalfW, y: triBase))
-                    projPath.addLine(to: CGPoint(x: projX + triHalfW, y: triBase))
-                    projPath.closeSubpath()
-                    context.fill(projPath, with: .color(.secondary.opacity(0.6)))
-                }
+                let paceX = xPosition(pacing.expectedUse)
+                var pacePath = Path()
+                pacePath.move(to: CGPoint(x: paceX, y: barY - 5))
+                pacePath.addLine(to: CGPoint(x: paceX, y: barY + barHeight + 5))
+                context.stroke(
+                    pacePath,
+                    with: .color(.primary.opacity(0.75)),
+                    style: StrokeStyle(lineWidth: 1.5, dash: [3, 3])
+                )
+
+                let projectionX = xPosition(pacing.predictedTotal)
+                var projectionPath = Path()
+                projectionPath.move(to: CGPoint(x: projectionX, y: barY - 4))
+                projectionPath.addLine(to: CGPoint(x: projectionX, y: barY + barHeight + 4))
+                context.stroke(
+                    projectionPath,
+                    with: .color(Color.blue.opacity(0.85)),
+                    style: StrokeStyle(lineWidth: 2)
+                )
+
+                let capX = xPosition(pacing.maxBudget)
+                context.fill(
+                    Path(
+                        roundedRect: CGRect(x: capX, y: barY - 4, width: capWidth, height: barHeight + 8),
+                        cornerRadius: 2
+                    ),
+                    with: .color(.primary.opacity(0.7))
+                )
             }
-            .frame(height: 26)
+            .frame(height: 28)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(budgetBarAccessibilityLabel)
 
-            // Legend
-            HStack(spacing: 0) {
-                legendItem(indicator: .dot(statusColor), label: String(format: "$%.2f spent", pacing.spend))
-                Spacer()
-                legendItem(indicator: .dashed, label: String(format: "$%.2f optimum", pacing.expectedUse))
-                Spacer()
-                if pacing.isOverBudget {
-                    if let exhaustDate = pacing.projectedBudgetExhaustDate {
-                        Text("full by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day())) · ")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    barKey(
+                        color: statusColor,
+                        text: "Spent: \(legendCurrency(pacing.spend))"
+                    )
+                    barKey(
+                        color: .primary.opacity(0.75),
+                        text: "Optimum: \(legendCurrency(pacing.expectedUse))",
+                        dashed: true
+                    )
+                    barKey(
+                        color: .primary.opacity(0.7),
+                        text: "Max: \(legendCurrency(pacing.maxBudget))"
+                    )
+                }
+
+                HStack(spacing: 10) {
+                    barKey(
+                        color: Color.blue.opacity(0.85),
+                        text: pacing.forecastSentence
+                    )
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func barKey(color: Color, text: String, dashed: Bool = false) -> some View {
+        HStack(spacing: 5) {
+            Group {
+                if dashed {
+                    Rectangle()
+                        .fill(color)
+                        .frame(width: 12, height: 1.5)
+                        .overlay(
+                            Rectangle()
+                                .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+                                .foregroundStyle(color)
+                        )
                 } else {
-                    legendItem(indicator: .triangle, label: String(format: "$%.2f projected", pacing.predictedTotal))
-                    Spacer()
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(color)
+                        .frame(width: 12, height: 4)
                 }
-                legendItem(indicator: .solid, label: String(format: "$%.2f max", pacing.maxBudget))
             }
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
         }
     }
 
-    private enum Indicator {
-        case dot(Color), dashed, solid, triangle
-    }
-
-    @ViewBuilder
-    private func legendItem(indicator: Indicator, label: String) -> some View {
-        HStack(spacing: 4) {
-            switch indicator {
-            case .dot(let color):
-                Circle().fill(color).frame(width: 6, height: 6)
-            case .dashed:
-                HStack(spacing: 1) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        Rectangle()
-                            .fill(Color.primary.opacity(0.4))
-                            .frame(width: 3, height: 1.5)
-                    }
-                }
-            case .solid:
-                Rectangle()
-                    .fill(Color.primary.opacity(0.55))
-                    .frame(width: 2, height: 10)
-            case .triangle:
-                Canvas { ctx, sz in
-                    var path = Path()
-                    path.move(to: CGPoint(x: sz.width / 2, y: 0))
-                    path.addLine(to: CGPoint(x: 0, y: sz.height))
-                    path.addLine(to: CGPoint(x: sz.width, y: sz.height))
-                    path.closeSubpath()
-                    ctx.fill(path, with: .color(.secondary.opacity(0.6)))
-                }
-                .frame(width: 8, height: 6)
-            }
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private func legendCurrency(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(format: "$%.0f", value)
         }
+        return String(format: "$%.2f", value)
     }
 }
 
-// MARK: - Status Badge
+// MARK: - Supporting Views
 
-struct StatusBadge: View {
-    let pacing: PacingInfo
+struct StatusPill: View {
+    let icon: String
+    let text: String
     let color: Color
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: pacing.status.icon)
+            Image(systemName: icon)
                 .font(.caption.weight(.semibold))
-            Text(statusText)
-                .font(.caption)
-                .multilineTextAlignment(.leading)
-            Spacer()
+            Text(text)
+                .font(.caption.weight(.semibold))
         }
         .foregroundStyle(color)
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.1)))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(color.opacity(0.14)))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(statusText)
+        .accessibilityLabel(text)
+    }
+}
+
+struct ActionInsightCard: View {
+    let pacing: PacingInfo
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(color)
+                Text(String(format: "Optimum daily spend: $%.2f/day", pacing.safeDailySpend))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+
+            Text(pacing.warningSentence)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.black.opacity(0.18))
+        )
+    }
+}
+
+// MARK: - Presentation Helpers
+
+private extension PacingInfo {
+    var forecastSentence: String {
+        switch status {
+        case .underPace:
+            return String(format: "At this pace, you'll finish around: $%.2f.", predictedTotal)
+        case .onTrack:
+            return String(format: "You're projected to finish around: $%.2f.", predictedTotal)
+        case .nearLimit:
+            return String(format: "At this pace, you'll finish around: $%.2f.", predictedTotal)
+        case .overPace:
+            return "At this pace, you may exceed your budget before reset."
+        case .unknown:
+            return "Projected outcome is not available."
+        }
     }
 
-    private var statusText: String {
-        switch pacing.status {
+    var warningSentence: String {
+        switch status {
         case .underPace:
             return String(
-                format: "Under pace · projected total: $%.2f, below your $%.2f budget",
-                pacing.predictedTotal,
-                pacing.maxBudget
+                format: "You still have about $%.2f of cushion at your current pace.",
+                maxBudget - predictedTotal
             )
         case .onTrack:
-            return String(
-                format: "On pace · projected total: $%.2f, within your $%.2f budget",
-                pacing.predictedTotal,
-                pacing.maxBudget
-            )
+            return "You're close to your ideal pace, so keep heavier usage days in check."
         case .nearLimit:
             return String(
-                format: "Near limit · projected total: $%.2f, close to your $%.2f budget",
-                pacing.predictedTotal,
-                pacing.maxBudget
+                format: "Only $%.2f of cushion remains at your current pace.",
+                max(maxBudget - predictedTotal, 0)
             )
         case .overPace:
-            if let exhaustDate = pacing.projectedBudgetExhaustDate {
-                return "Over pace · budget exhausted by \(exhaustDate.formatted(.dateTime.month(.abbreviated).day()))"
+            if let exhaustDate = projectedBudgetExhaustDate {
+                let day = exhaustDate.formatted(.dateTime.month(.abbreviated).day())
+                return "You're trending above your ideal pace and could run out by \(day)."
             }
-            return String(
-                format: "Over pace · projected total: $%.2f, above your $%.2f budget",
-                pacing.predictedTotal,
-                pacing.maxBudget
-            )
+            return "A few heavier usage days could push you over budget."
         case .unknown:
-            return "Status unavailable"
+            return "More budget data is needed for pacing guidance."
         }
-    }
-}
-
-// MARK: - Reusable Sub-components
-
-struct SupportingMetric: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(spacing: 1) {
-            Text(value)
-                .font(.caption.weight(.semibold))
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-    }
-}
-
-struct StatChip: View {
-    let icon: String
-    let label: String
-    let value: String
-    var detail: String?
-    var color: Color = .secondary
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 3) {
-                Image(systemName: icon)
-                    .font(.caption2.weight(.medium))
-                Text(label)
-                    .font(.caption2)
-            }
-            .foregroundStyle(color.opacity(0.8))
-
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            if let detail {
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(color.opacity(0.1))
-        )
     }
 }
 
