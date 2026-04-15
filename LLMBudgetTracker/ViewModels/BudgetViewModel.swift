@@ -268,7 +268,8 @@ final class BudgetViewModel {
         }
         if let until = rateLimitedUntil, until > Date() {
             errorMessage = "Rate limited — pausing until \(until.formatted(date: .omitted, time: .shortened))"
-            return }
+            return
+        }
         guard !isLoading else { return }
         appState = budgetInfo == nil ? .loading : .refreshing
         isLoading = true
@@ -280,6 +281,8 @@ final class BudgetViewModel {
                 try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
             }
             await handleBudgetSuccess(info: info, rawJSON: json, statusCode: status, apiKey: apiKey)
+        } catch is CancellationError {
+            return
         } catch {
             handleRefreshError(error)
         }
@@ -488,9 +491,11 @@ final class BudgetViewModel {
     ) async throws -> T {
         var lastError: Error = URLError(.unknown)
         for attempt in 0..<attempts {
-            guard !Task.isCancelled else { throw lastError }
+            try Task.checkCancellation()
             do {
                 return try await operation()
+            } catch is CancellationError {
+                throw CancellationError()
             } catch let error as APIError {
                 if case .httpError(let code) = error, code != 429, (400..<500).contains(code) {
                     throw error
@@ -505,7 +510,8 @@ final class BudgetViewModel {
                        case .httpError(429) = apiErr { return .seconds(30) }
                     return .seconds(2)
                 }()
-                try? await Task.sleep(for: delay)
+                try Task.checkCancellation()
+                try await Task.sleep(for: delay)
             }
         }
         throw lastError

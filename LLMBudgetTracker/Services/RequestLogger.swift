@@ -49,8 +49,16 @@ final class RequestLogger {
     }
 
     private func load() {
-        guard let data = EncryptedStore.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([APIRequestLog].self, from: data) else { return }
+        guard let data = EncryptedStore.data(forKey: key) else {
+            if UserDefaults.standard.object(forKey: key) != nil {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+            return
+        }
+        guard let decoded = try? JSONDecoder().decode([APIRequestLog].self, from: data) else {
+            EncryptedStore.remove(forKey: key)
+            return
+        }
         let cutoff = Date().addingTimeInterval(-maxAge)
         logs = Array(
             decoded
