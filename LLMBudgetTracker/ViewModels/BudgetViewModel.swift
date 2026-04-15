@@ -301,7 +301,9 @@ final class BudgetViewModel {
         defer { isLoading = false }
 
         do {
-            let (info, json, status) = try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            let (info, json, status) = try await withRetry {
+                try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            }
             await handleBudgetSuccess(info: info, rawJSON: json, statusCode: status, apiKey: apiKey)
         } catch {
             handleRefreshError(error)
@@ -364,6 +366,10 @@ final class BudgetViewModel {
         if let apiError = error as? APIError {
             switch apiError {
             case .httpError(let code) where code == 401 || code == 403: appState = .authError
+            case .httpError(429):
+                appState = .networkError
+                errorMessage = "Rate limited — will retry shortly"
+                return
             case .httpError: appState = .networkError
             case .invalidURL: appState = .networkError
             }
@@ -499,6 +505,39 @@ final class BudgetViewModel {
 
     // MARK: - Helpers
 
+    /// Retries `operation` up to `attempts` times.
+    /// - 4xx errors (except 429) are not retried — they won't self-resolve.
+    /// - 429 uses a longer back-off delay.
+    /// - Task cancellation stops retrying immediately.
+    private func withRetry<T>(
+        attempts: Int = 3,
+        operation: () async throws -> T
+    ) async throws -> T {
+        var lastError: Error = URLError(.unknown)
+        for attempt in 0..<attempts {
+            guard !Task.isCancelled else { throw lastError }
+            do {
+                return try await operation()
+            } catch let error as APIError {
+                if case .httpError(let code) = error, code != 429, (400..<500).contains(code) {
+                    throw error
+                }
+                lastError = error
+            } catch {
+                lastError = error
+            }
+            if attempt < attempts - 1 {
+                let delay: Duration = {
+                    if let apiErr = lastError as? APIError,
+                       case .httpError(429) = apiErr { return .seconds(30) }
+                    return .seconds(2)
+                }()
+                try? await Task.sleep(for: delay)
+            }
+        }
+        throw lastError
+    }
+
     private func logAPIRequest(
         endpoint: String,
         queryParams: [String: String] = [:],
@@ -550,13 +589,15 @@ final class BudgetViewModel {
             "page_size": "32"
         ]
         do {
-            let (fetched, rawJSON, statusCode) = try await api.fetchDailyActivity(
-                baseURL: endpointURL,
-                apiKey: apiKey,
-                userId: info.userId,
-                startDate: startDate,
-                endDate: today
-            )
+            let (fetched, rawJSON, statusCode) = try await withRetry {
+                try await api.fetchDailyActivity(
+                    baseURL: endpointURL,
+                    apiKey: apiKey,
+                    userId: info.userId,
+                    startDate: startDate,
+                    endDate: today
+                )
+            }
 
             let result = mergeAndPersistActivity(cache: cache, fetched: fetched, today: today)
             dailyActivity = result
@@ -588,15 +629,29 @@ final class BudgetViewModel {
         }
     }
 
+    private struct CachedActivityEnvelope: Codable {
+        static let currentVersion = 1
+        let version: Int
+        let items: [DailySpendData]
+    }
+
     private func loadCachedActivity() -> [DailySpendData] {
-        guard let data = UserDefaults.standard.data(forKey: StorageKeys.App.dailyActivityCache),
-              let decoded = try? JSONDecoder().decode([DailySpendData].self, from: data) else { return [] }
-        return decoded
+        guard let data = EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache) else { return [] }
+        if let envelope = try? JSONDecoder().decode(CachedActivityEnvelope.self, from: data) {
+            guard envelope.version == CachedActivityEnvelope.currentVersion else {
+                EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
+                return []
+            }
+            return envelope.items
+        }
+        // Legacy: plain array stored before versioning was introduced
+        return (try? JSONDecoder().decode([DailySpendData].self, from: data)) ?? []
     }
 
     private func saveCachedActivity(_ items: [DailySpendData]) {
-        if let encoded = try? JSONEncoder().encode(items) {
-            UserDefaults.standard.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
+        let envelope = CachedActivityEnvelope(version: CachedActivityEnvelope.currentVersion, items: items)
+        if let encoded = try? JSONEncoder().encode(envelope) {
+            EncryptedStore.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
         }
     }
 
@@ -620,7 +675,7 @@ final class BudgetViewModel {
     func clearDailyActivityData() {
         spendLogs = []
         dailyActivity = []
-        UserDefaults.standard.removeObject(forKey: StorageKeys.App.dailyActivityCache)
+        EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
     }
 
     private func computePacing(from info: BudgetInfo) {
