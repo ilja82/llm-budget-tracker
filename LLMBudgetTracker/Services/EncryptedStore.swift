@@ -53,7 +53,6 @@ enum EncryptedStore {
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: AppKeychain.service,
             kSecAttrAccount: keychainAccount,
-            kSecUseDataProtectionKeychain: true,
             kSecReturnData: true,
             kSecMatchLimit: kSecMatchLimitOne
         ]
@@ -69,16 +68,20 @@ enum EncryptedStore {
 
     @discardableResult
     private static func saveKey(_ data: Data) -> Bool {
-        let query: [CFString: Any] = [
+        let lookupQuery: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrService: AppKeychain.service,
+            kSecAttrAccount: keychainAccount
+        ]
+        SecItemDelete(lookupQuery as CFDictionary)
+        let addQuery: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: AppKeychain.service,
             kSecAttrAccount: keychainAccount,
-            kSecUseDataProtectionKeychain: true,
             kSecValueData: data,
             kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
-        SecItemDelete(query as CFDictionary)
-        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+        return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
 }
 
