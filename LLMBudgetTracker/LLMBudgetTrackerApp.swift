@@ -9,6 +9,6 @@ struct LLMBudgetTrackerApp: App {
             SettingsView()
                 .environment(statusBarController.viewModel)
         }
-        .windowResizability(.contentMinSize)
+        .windowResizability(.contentSize)
     }
 }

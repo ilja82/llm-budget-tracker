@@ -422,7 +422,6 @@ final class BudgetViewModel {
     private func injectDevData() {
         let totalDays = max(devMode.totalDays, 1)
         let daysRemaining = min(max(devMode.daysRemaining, 0), totalDays)
-        let daysPassed = max(totalDays - daysRemaining, 1)
         // Snap resetAt to the 1st of the next calendar month. billingStart is derived
         // separately from the calendar month start (not from budgetDuration), so it
         // correctly aligns to the 1st regardless of the configured totalDays value.

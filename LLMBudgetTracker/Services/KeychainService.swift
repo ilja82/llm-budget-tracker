@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 enum AppKeychain {
-    static let service = "com.ilja82.lite-budget"
+    static let service = "com.ilja82.llm-budget-tracker"
 }
 
 enum KeychainService {
@@ -12,8 +12,7 @@ enum KeychainService {
         [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: AppKeychain.service,
-            kSecAttrAccount: account,
-            kSecUseDataProtectionKeychain: true
+            kSecAttrAccount: account
         ]
     }
 
@@ -21,13 +20,21 @@ enum KeychainService {
         guard let data = secret.data(using: .utf8) else {
             throw KeychainError.encodingFailed
         }
-        var query = baseQuery
-        query[kSecValueData] = data
-        query[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.saveFailed(status)
+        let attributes: [CFString: Any] = [
+            kSecValueData: data,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecItemNotFound {
+            var addQuery = baseQuery
+            addQuery[kSecValueData] = data
+            addQuery[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+            guard addStatus == errSecSuccess else {
+                throw KeychainError.saveFailed(addStatus)
+            }
+        } else if updateStatus != errSecSuccess {
+            throw KeychainError.saveFailed(updateStatus)
         }
     }
 

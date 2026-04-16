@@ -62,11 +62,25 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
 
-            SecureField("API key", text: $newAPIKey, prompt: Text("Paste your API key"))
+            SecureField("API key", text: $newAPIKey, prompt: Text(KeychainService.isConfigured ? "Enter new key to replace existing" : "Paste your API key"))
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: newAPIKey) { _, _ in
                     connectionStatus = .idle
                 }
+
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Your API key is securely stored in the macOS Keychain."
+                                + " You may be prompted to enter your macOS login password when saving it."
+                                + " To avoid being prompted again, select 'Always Allow' on the password input screen.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
 
             HStack(spacing: 8) {
                 Spacer()
