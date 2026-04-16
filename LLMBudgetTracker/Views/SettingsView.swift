@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var versionTapCount = 0
     @State private var devModeUnlocked = UserDefaults.standard.bool(forKey: StorageKeys.DevMode.unlocked)
     @State private var showDevModeSheet = false
+    @State private var apiKeyConfigured = false
 
     private let refreshOptions = [5, 15, 30, 60, 120]
     private let diagnosticsEnabledForBuild: Bool = {
@@ -39,6 +40,7 @@ struct SettingsView: View {
         .onAppear {
             proxyURL = viewModel.endpointURL
             autoStart = AutoStartService.isEnabled
+            apiKeyConfigured = KeychainService.isConfigured
         }
         .sheet(isPresented: $showDevModeSheet) {
             DevModeView()
@@ -62,7 +64,11 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
 
-            SecureField("API key", text: $newAPIKey, prompt: Text(KeychainService.isConfigured ? "Enter new key to replace existing" : "Paste your API key"))
+            SecureField(
+                "API key",
+                text: $newAPIKey,
+                prompt: Text(apiKeyConfigured ? "Enter new key to replace existing" : "Paste your API key")
+            )
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: newAPIKey) { _, _ in
                     connectionStatus = .idle
@@ -309,6 +315,7 @@ struct SettingsView: View {
             proxyURL = normalizedURL
             viewModel.clearDailyActivityData()
             newAPIKey = ""
+            apiKeyConfigured = true
             connectionStatus = .result("Settings saved", true)
             Task {
                 try? await Task.sleep(for: .seconds(3))
