@@ -51,8 +51,17 @@ fi
 
 echo "Preparing release branch for $TAG..."
 
+RELEASE_BRANCH="release/$TAG"
 # Create and switch to release branch
-git checkout -b "release/$TAG"
+if git show-ref --verify --quiet "refs/heads/$RELEASE_BRANCH"; then
+  echo "Error: branch $RELEASE_BRANCH already exists locally"
+  exit 1
+fi
+if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+  echo "Error: branch $RELEASE_BRANCH already exists on origin"
+  exit 1
+fi
+git checkout -b "$RELEASE_BRANCH"
 
 # Bump MARKETING_VERSION in project.yml
 sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"$VERSION\"/" project.yml
@@ -64,7 +73,7 @@ sed -i '' "s/CURRENT_PROJECT_VERSION: \"[^\"]*\"/CURRENT_PROJECT_VERSION: \"$NEX
 
 git add project.yml
 git commit -m "Prepare release $TAG"
-git push origin "release/$TAG"
+git push origin "$RELEASE_BRANCH"
 
 echo ""
 echo "Branch release/$TAG pushed."

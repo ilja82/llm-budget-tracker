@@ -78,6 +78,7 @@ struct SettingsView: View {
                 Image(systemName: "lock.fill")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text("Your API key is securely stored in the macOS Keychain."
                                 + " You may be prompted to enter your macOS login password when saving it."
                                 + " To avoid being prompted again, select 'Always Allow' on the password input screen.")

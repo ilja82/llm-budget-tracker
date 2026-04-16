@@ -25,6 +25,10 @@ fi
 
 # Read version from project.yml
 VERSION=$(grep 'MARKETING_VERSION:' project.yml | sed "s/.*MARKETING_VERSION: \"//;s/\".*//")
+if [ -z "$VERSION" ]; then
+  echo "Error: MARKETING_VERSION is missing or empty in project.yml"
+  exit 1
+fi
 TAG="v$VERSION"
 
 # Tag must not already exist

@@ -235,7 +235,7 @@ struct BudgetBar: View {
     }
 
     var body: some View {
-        let scale = scale
+        let scale = self.scale
         VStack(alignment: .leading, spacing: 8) {
             Canvas { context, size in
                 let width = size.width
