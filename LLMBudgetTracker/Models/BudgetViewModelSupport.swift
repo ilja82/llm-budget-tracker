@@ -34,20 +34,29 @@ extension BudgetViewModel {
 
     /// Summed spend per model-group across `range`, ranked descending.
     func modelGroupSpendTotals(range: ModelRange) -> [(model: String, spend: Double)] {
-        let calendar = Calendar.current
+        // Build cutoff in a UTC calendar so it matches the basis of `DailySpendData.date`
+        // (UTC "yyyy-MM-dd"). Using `Calendar.current` would roll to the prior UTC day
+        // in east-of-UTC zones and leak an extra day into the totals.
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
         let today = Date()
-        let cutoffDate: Date
+        let cutoffComponents: DateComponents
         switch range {
         case .thisMonth:
-            cutoffDate = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
+            cutoffComponents = utcCal.dateComponents([.year, .month], from: today)
         case .last28:
-            cutoffDate = calendar.date(byAdding: .day, value: -27, to: calendar.startOfDay(for: today)) ?? today
+            let startOfToday = utcCal.startOfDay(for: today)
+            guard let start = utcCal.date(byAdding: .day, value: -27, to: startOfToday) else {
+                return []
+            }
+            cutoffComponents = utcCal.dateComponents([.year, .month, .day], from: start)
         }
-        // Stringify cutoff in UTC to match the basis used by `DailySpendData.date`.
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = TimeZone(secondsFromGMT: 0)
-        let cutoffStr = fmt.string(from: cutoffDate)
+        let cutoffStr = String(
+            format: "%04d-%02d-%02d",
+            cutoffComponents.year ?? 0,
+            cutoffComponents.month ?? 0,
+            cutoffComponents.day ?? 1
+        )
         var totals: [String: Double] = [:]
         for entry in dailyActivity where entry.date >= cutoffStr {
             guard let groups = entry.breakdown?.modelGroups else { continue }
