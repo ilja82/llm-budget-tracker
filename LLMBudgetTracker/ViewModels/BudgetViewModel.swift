@@ -235,7 +235,7 @@ final class BudgetViewModel {
     private static let iso8601Display = ISO8601DateFormatter()
 
     init() {
-        if dailyActivityEnabled {
+        if dailyActivityEnabled && !devMode.isEnabled {
             let cached = loadCachedActivity()
             dailyActivity = cached
             spendLogs = cached.compactMap { $0.toSpendLog() }
