@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RequestsChartView: View {
     let data: [DailySpendData]
+    let currentPeriodStart: Date?
     private let points: [RequestPoint]
 
     private struct RequestPoint: Identifiable {
@@ -19,8 +20,9 @@ struct RequestsChartView: View {
         return f
     }()
 
-    init(data: [DailySpendData]) {
+    init(data: [DailySpendData], currentPeriodStart: Date? = nil) {
         self.data = data
+        self.currentPeriodStart = currentPeriodStart
         let fmt = Self.dateFmt
         var result: [RequestPoint] = []
         for entry in data.sorted(by: { $0.date < $1.date }) {
@@ -44,12 +46,24 @@ struct RequestsChartView: View {
     }
 
     private var chartBody: some View {
-        Chart(points) { point in
-            BarMark(
-                x: .value("Date", point.date, unit: .day),
-                y: .value("Requests", point.count)
-            )
-            .foregroundStyle(by: .value("Type", point.type))
+        Chart {
+            if let start = currentPeriodStart,
+               let last = points.map(\.date).max(),
+               start <= last {
+                RectangleMark(
+                    xStart: .value("Period start", start),
+                    xEnd: .value("Period end", last)
+                )
+                .foregroundStyle(Color.accentColor.opacity(0.10))
+            }
+
+            ForEach(points) { point in
+                BarMark(
+                    x: .value("Date", point.date, unit: .day),
+                    y: .value("Requests", point.count)
+                )
+                .foregroundStyle(by: .value("Type", point.type))
+            }
         }
         .chartForegroundStyleScale([
             "Success": Color.green,

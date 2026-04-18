@@ -150,19 +150,21 @@ final class BudgetViewModel {
         return computed
     }
 
+    var currentPeriodStart: Date? {
+        guard let info = budgetInfo, let resetAt = info.budgetResetAt,
+              let dur = info.budgetDuration, let days = parseDurationDays(dur) else { return nil }
+        let cal = Calendar.current
+        return cal.startOfDay(for: cal.date(byAdding: .day, value: -days, to: resetAt) ?? Date())
+    }
+
     private func computeSafeSpendLine() -> [(date: Date, amount: Double)] {
         guard let info = budgetInfo,
-              let maxBudget = info.maxBudget,
-              maxBudget > 0,
+              let maxBudget = info.maxBudget, maxBudget > 0,
               let resetAt = info.budgetResetAt,
-              let durationStr = info.budgetDuration,
-              let totalDays = parseDurationDays(durationStr) else { return [] }
+              let billingStart = currentPeriodStart else { return [] }
 
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let billingStart = calendar.startOfDay(
-            for: calendar.date(byAdding: .day, value: -totalDays, to: resetAt) ?? Date()
-        )
         let windowEnd = calendar.date(byAdding: .day, value: 1, to: today) ?? today
         let daysInWindow = calendar.dateComponents([.day], from: billingStart, to: windowEnd).day ?? 0
         guard daysInWindow > 0 else { return [] }

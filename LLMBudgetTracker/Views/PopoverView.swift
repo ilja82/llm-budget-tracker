@@ -24,15 +24,22 @@ struct PopoverView: View {
                         if !viewModel.dailySpend.isEmpty {
                             UsageChartView(
                                 data: viewModel.dailySpend,
-                                safeLine: viewModel.safeSpendLine
+                                safeLine: viewModel.safeSpendLine,
+                                currentPeriodStart: viewModel.currentPeriodStart
                             )
                             .transition(.opacity)
                         }
                         if !viewModel.dailyActivity.isEmpty {
-                            TokenChartView(data: viewModel.dailyActivity)
-                                .transition(.opacity)
-                            RequestsChartView(data: viewModel.dailyActivity)
-                                .transition(.opacity)
+                            TokenChartView(
+                                data: viewModel.dailyActivity,
+                                currentPeriodStart: viewModel.currentPeriodStart
+                            )
+                            .transition(.opacity)
+                            RequestsChartView(
+                                data: viewModel.dailyActivity,
+                                currentPeriodStart: viewModel.currentPeriodStart
+                            )
+                            .transition(.opacity)
                         }
                         secondaryControlsSection
                     }

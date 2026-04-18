@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TokenChartView: View {
     let data: [DailySpendData]
+    let currentPeriodStart: Date?
     private let points: [TokenPoint]
 
     private struct TokenPoint: Identifiable {
@@ -19,8 +20,9 @@ struct TokenChartView: View {
         return f
     }()
 
-    init(data: [DailySpendData]) {
+    init(data: [DailySpendData], currentPeriodStart: Date? = nil) {
         self.data = data
+        self.currentPeriodStart = currentPeriodStart
         let fmt = Self.dateFmt
         var result: [TokenPoint] = []
         for entry in data.sorted(by: { $0.date < $1.date }) {
@@ -51,12 +53,24 @@ struct TokenChartView: View {
     }
 
     private var chartBody: some View {
-        Chart(points) { point in
-            BarMark(
-                x: .value("Date", point.date, unit: .day),
-                y: .value("Tokens", point.tokens)
-            )
-            .foregroundStyle(by: .value("Type", point.type))
+        Chart {
+            if let start = currentPeriodStart,
+               let last = points.map(\.date).max(),
+               start <= last {
+                RectangleMark(
+                    xStart: .value("Period start", start),
+                    xEnd: .value("Period end", last)
+                )
+                .foregroundStyle(Color.accentColor.opacity(0.10))
+            }
+
+            ForEach(points) { point in
+                BarMark(
+                    x: .value("Date", point.date, unit: .day),
+                    y: .value("Tokens", point.tokens)
+                )
+                .foregroundStyle(by: .value("Type", point.type))
+            }
         }
         .chartXAxis {
             AxisMarks(values: .stride(by: .day, count: strideCount)) { _ in

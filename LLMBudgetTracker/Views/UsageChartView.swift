@@ -4,11 +4,17 @@ import SwiftUI
 struct UsageChartView: View {
     let data: [(date: Date, amount: Double)]
     let safeLine: [(date: Date, amount: Double)]
+    let currentPeriodStart: Date?
     private let safeLimitByDay: [Date: Double]
 
-    init(data: [(date: Date, amount: Double)], safeLine: [(date: Date, amount: Double)] = []) {
+    init(
+        data: [(date: Date, amount: Double)],
+        safeLine: [(date: Date, amount: Double)] = [],
+        currentPeriodStart: Date? = nil
+    ) {
         self.data = data
         self.safeLine = safeLine
+        self.currentPeriodStart = currentPeriodStart
         var dict: [Date: Double] = [:]
         let cal = Calendar.current
         for point in safeLine {
@@ -30,6 +36,16 @@ struct UsageChartView: View {
 
     private var chartBody: some View {
         Chart {
+            if let start = currentPeriodStart,
+               let last = data.map(\.date).max(),
+               start <= last {
+                RectangleMark(
+                    xStart: .value("Period start", start),
+                    xEnd: .value("Period end", last)
+                )
+                .foregroundStyle(Color.accentColor.opacity(0.10))
+            }
+
             ForEach(data, id: \.date) { point in
                 BarMark(
                     x: .value("Date", point.date, unit: .day),
