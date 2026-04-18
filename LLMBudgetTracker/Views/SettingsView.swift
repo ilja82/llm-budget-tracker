@@ -42,6 +42,9 @@ struct SettingsView: View {
             autoStart = AutoStartService.isEnabled
             apiKeyConfigured = viewModel.devMode.isEnabled ? false : KeychainService.isConfigured
         }
+        .onChange(of: viewModel.devMode.isEnabled) { _, _ in
+            apiKeyConfigured = viewModel.devMode.isEnabled ? false : KeychainService.isConfigured
+        }
         .sheet(isPresented: $showDevModeSheet) {
             DevModeView()
                 .environment(viewModel)

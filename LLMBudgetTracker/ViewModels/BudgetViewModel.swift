@@ -158,8 +158,12 @@ final class BudgetViewModel {
         guard let utcStart = utcCal.date(byAdding: .day, value: -days, to: resetAt) else { return nil }
         // Map UTC Y-M-D to local midnight so it aligns with local-day bar buckets
         // and with dateComponents([.day], from:to:) using Calendar.current downstream.
+        // Use an explicit Gregorian calendar for the reconstruction so non-Gregorian
+        // system calendars (Buddhist, Japanese, …) don't misinterpret the components.
         let components = utcCal.dateComponents([.year, .month, .day], from: utcStart)
-        return Calendar.current.date(from: components)
+        var localCal = Calendar(identifier: .gregorian)
+        localCal.timeZone = .current
+        return localCal.date(from: components)
     }
 
     private func computeSafeSpendLine() -> [(date: Date, amount: Double)] {
@@ -637,8 +641,8 @@ final class BudgetViewModel {
         today: Date
     ) -> [DailySpendData] {
         var merged: [String: DailySpendData] = [:]
-        for entry in cache { merged[entry.date] = entry }
-        for entry in fetched { merged[entry.date] = entry }
+        for entry in cache where !entry.date.isEmpty { merged[entry.date] = entry }
+        for entry in fetched where !entry.date.isEmpty { merged[entry.date] = entry }
         let cutoff = Calendar.current.date(byAdding: .day, value: -62, to: today) ?? today
         let cutoffStr = Self.dailyFmt.string(from: cutoff)
         let result = merged.values

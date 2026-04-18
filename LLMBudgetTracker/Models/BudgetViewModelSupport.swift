@@ -6,7 +6,7 @@ enum DiagnosticLoggingMode {
 }
 
 struct CachedActivityEnvelope: Codable {
-    static let currentVersion = 2
+    static let currentVersion = 1
     let version: Int
     let items: [DailySpendData]
 }
@@ -35,20 +35,21 @@ extension BudgetViewModel {
     /// Summed spend per model-group across `range`, ranked descending.
     func modelGroupSpendTotals(range: ModelRange) -> [(model: String, spend: Double)] {
         let calendar = Calendar.current
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = TimeZone(identifier: "UTC")
         let today = Date()
-        let cutoff: Date
+        let cutoffDate: Date
         switch range {
         case .thisMonth:
-            cutoff = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
+            cutoffDate = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
         case .last28:
-            cutoff = calendar.date(byAdding: .day, value: -27, to: calendar.startOfDay(for: today)) ?? today
+            cutoffDate = calendar.date(byAdding: .day, value: -27, to: calendar.startOfDay(for: today)) ?? today
         }
+        // Stringify cutoff in local TZ so both sides of the comparison share a basis.
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = .current
+        let cutoffStr = fmt.string(from: cutoffDate)
         var totals: [String: Double] = [:]
-        for entry in dailyActivity {
-            guard let date = fmt.date(from: entry.date), date >= cutoff else { continue }
+        for entry in dailyActivity where entry.date >= cutoffStr {
             guard let groups = entry.breakdown?.modelGroups else { continue }
             for (name, group) in groups {
                 totals[name, default: 0] += group.metrics.spend

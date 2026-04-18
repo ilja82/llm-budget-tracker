@@ -13,6 +13,18 @@ struct UnifiedActivityChartView: View {
         return f
     }()
 
+    /// Convert a UTC "yyyy-MM-dd" day key into local midnight so chart bars align
+    /// with `Calendar.current` .day buckets and with `currentPeriodStart` / safe lines.
+    private static func localMidnight(from ymd: String) -> Date? {
+        guard let utc = dateFmt.date(from: ymd) else { return nil }
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let comps = utcCal.dateComponents([.year, .month, .day], from: utc)
+        var localCal = Calendar(identifier: .gregorian)
+        localCal.timeZone = .current
+        return localCal.date(from: comps)
+    }
+
     private var metric: MetricKind {
         MetricKind(rawValue: metricRaw) ?? .spend
     }
@@ -119,11 +131,10 @@ struct UnifiedActivityChartView: View {
     }
 
     private var spendPoints: [SpendPoint] {
-        let fmt = Self.dateFmt
-        return viewModel.dailyActivity
+        viewModel.dailyActivity
             .sorted { $0.date < $1.date }
             .compactMap { entry in
-                guard let date = fmt.date(from: entry.date) else { return nil }
+                guard let date = Self.localMidnight(from: entry.date) else { return nil }
                 let amount = viewModel.metrics(for: entry, model: modelFilter).spend
                 return SpendPoint(id: entry.date, date: date, amount: amount)
             }
@@ -265,10 +276,9 @@ struct UnifiedActivityChartView: View {
     }
 
     private var tokenPoints: [TokenPoint] {
-        let fmt = Self.dateFmt
         var result: [TokenPoint] = []
         for entry in viewModel.dailyActivity.sorted(by: { $0.date < $1.date }) {
-            guard let date = fmt.date(from: entry.date) else { continue }
+            guard let date = Self.localMidnight(from: entry.date) else { continue }
             let metrics = viewModel.metrics(for: entry, model: modelFilter)
             result.append(.init(
                 id: "\(entry.date)-prompt", date: date, type: "Prompt", tokens: metrics.promptTokens))
@@ -337,10 +347,9 @@ struct UnifiedActivityChartView: View {
     }
 
     private var requestPoints: [RequestPoint] {
-        let fmt = Self.dateFmt
         var result: [RequestPoint] = []
         for entry in viewModel.dailyActivity.sorted(by: { $0.date < $1.date }) {
-            guard let date = fmt.date(from: entry.date) else { continue }
+            guard let date = Self.localMidnight(from: entry.date) else { continue }
             let metrics = viewModel.metrics(for: entry, model: modelFilter)
             result.append(.init(
                 id: "\(entry.date)-success", date: date, type: "Success", count: metrics.successfulRequests))
