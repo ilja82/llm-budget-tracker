@@ -40,7 +40,10 @@ struct SettingsView: View {
         .onAppear {
             proxyURL = viewModel.endpointURL
             autoStart = AutoStartService.isEnabled
-            apiKeyConfigured = KeychainService.isConfigured
+            apiKeyConfigured = viewModel.devMode.isEnabled ? false : KeychainService.isConfigured
+        }
+        .onChange(of: viewModel.devMode.isEnabled) { _, _ in
+            apiKeyConfigured = viewModel.devMode.isEnabled ? false : KeychainService.isConfigured
         }
         .sheet(isPresented: $showDevModeSheet) {
             DevModeView()

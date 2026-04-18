@@ -32,3 +32,7 @@ targets:
         CURRENT_PROJECT_VERSION: "3"
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker.debug
+          INFOPLIST_KEY_CFBundleDisplayName: LLM Budget Tracker (Debug)

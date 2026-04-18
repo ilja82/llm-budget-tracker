@@ -150,19 +150,30 @@ final class BudgetViewModel {
         return computed
     }
 
+    var currentPeriodStart: Date? {
+        guard let info = budgetInfo, let resetAt = info.budgetResetAt,
+              let dur = info.budgetDuration, let days = parseDurationDays(dur) else { return nil }
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        guard let utcStart = utcCal.date(byAdding: .day, value: -days, to: resetAt) else { return nil }
+        // Map UTC Y-M-D to local midnight so it aligns with local-day bar buckets
+        // and with dateComponents([.day], from:to:) using Calendar.current downstream.
+        // Use an explicit Gregorian calendar for the reconstruction so non-Gregorian
+        // system calendars (Buddhist, Japanese, …) don't misinterpret the components.
+        let components = utcCal.dateComponents([.year, .month, .day], from: utcStart)
+        var localCal = Calendar(identifier: .gregorian)
+        localCal.timeZone = .current
+        return localCal.date(from: components)
+    }
+
     private func computeSafeSpendLine() -> [(date: Date, amount: Double)] {
         guard let info = budgetInfo,
-              let maxBudget = info.maxBudget,
-              maxBudget > 0,
+              let maxBudget = info.maxBudget, maxBudget > 0,
               let resetAt = info.budgetResetAt,
-              let durationStr = info.budgetDuration,
-              let totalDays = parseDurationDays(durationStr) else { return [] }
+              let billingStart = currentPeriodStart else { return [] }
 
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let billingStart = calendar.startOfDay(
-            for: calendar.date(byAdding: .day, value: -totalDays, to: resetAt) ?? Date()
-        )
         let windowEnd = calendar.date(byAdding: .day, value: 1, to: today) ?? today
         let daysInWindow = calendar.dateComponents([.day], from: billingStart, to: windowEnd).day ?? 0
         guard daysInWindow > 0 else { return [] }
@@ -235,7 +246,7 @@ final class BudgetViewModel {
     private static let iso8601Display = ISO8601DateFormatter()
 
     init() {
-        if dailyActivityEnabled {
+        if dailyActivityEnabled && !devMode.isEnabled {
             let cached = loadCachedActivity()
             dailyActivity = cached
             spendLogs = cached.compactMap { $0.toSpendLog() }
@@ -458,38 +469,7 @@ final class BudgetViewModel {
     }
 
     private func generateFakeDailyActivity(daysPassed: Int, totalSpend: Double) -> [DailySpendData] {
-        guard daysPassed > 0 else { return [] }
-        let fmt = Self.dailyFmt
-        let weights = (0..<daysPassed).map { _ in Double.random(in: 0.5...1.5) }
-        let totalWeight = max(weights.reduce(0, +), 0.0001)
-
-        return (0..<daysPassed).map { i in
-            let daysBack = daysPassed - i - 1
-            let date = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-            let spend = totalSpend > 0
-                ? max(0.001, totalSpend * (weights[i] / totalWeight))
-                : totalSpend / Double(daysPassed)
-            let prompt = Int.random(in: 500...5000)
-            let completion = Int.random(in: 100...1000)
-            let cacheRead = Int.random(in: 0...2000)
-            let cacheWrite = Int.random(in: 0...500)
-            let success = Int.random(in: 5...40)
-            let failed = Int.random(in: 0...3)
-            return DailySpendData(
-                date: fmt.string(from: date),
-                metrics: SpendMetrics(
-                    spend: spend,
-                    promptTokens: prompt,
-                    completionTokens: completion,
-                    cacheReadInputTokens: cacheRead,
-                    cacheCreationInputTokens: cacheWrite,
-                    totalTokens: prompt + completion + cacheRead + cacheWrite,
-                    successfulRequests: success,
-                    failedRequests: failed,
-                    apiRequests: success + failed
-                )
-            )
-        }
+        FakeDailyActivity.generate(daysPassed: daysPassed, totalSpend: totalSpend)
     }
 
     // MARK: - Helpers
@@ -661,8 +641,8 @@ final class BudgetViewModel {
         today: Date
     ) -> [DailySpendData] {
         var merged: [String: DailySpendData] = [:]
-        for entry in cache { merged[entry.date] = entry }
-        for entry in fetched { merged[entry.date] = entry }
+        for entry in cache where !entry.date.isEmpty { merged[entry.date] = entry }
+        for entry in fetched where !entry.date.isEmpty { merged[entry.date] = entry }
         let cutoff = Calendar.current.date(byAdding: .day, value: -62, to: today) ?? today
         let cutoffStr = Self.dailyFmt.string(from: cutoff)
         let result = merged.values
@@ -767,13 +747,12 @@ final class BudgetViewModel {
 
     private func startTimer() {
         timerTask = Task { [weak self] in
-            guard let self else { return }
-            await self.refresh()
+            await self?.refresh()
             while !Task.isCancelled {
-                let interval = self.updateIntervalMinutes
+                let interval = self?.updateIntervalMinutes ?? 60
                 try? await Task.sleep(for: .seconds(Double(interval) * 60))
-                guard !Task.isCancelled else { break }
-                await self.refresh()
+                if Task.isCancelled { break }
+                await self?.refresh()
             }
         }
     }

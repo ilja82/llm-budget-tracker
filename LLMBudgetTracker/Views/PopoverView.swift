@@ -21,22 +21,14 @@ struct PopoverView: View {
                 ScrollView {
                     VStack(spacing: 10) {
                         StatsView()
-                        if !viewModel.dailySpend.isEmpty {
-                            UsageChartView(
-                                data: viewModel.dailySpend,
-                                safeLine: viewModel.safeSpendLine
-                            )
-                            .transition(.opacity)
-                        }
                         if !viewModel.dailyActivity.isEmpty {
-                            TokenChartView(data: viewModel.dailyActivity)
+                            UnifiedActivityChartView()
                                 .transition(.opacity)
-                            RequestsChartView(data: viewModel.dailyActivity)
+                            ModelSpendBreakdownChartView()
                                 .transition(.opacity)
                         }
                         secondaryControlsSection
                     }
-                    .animation(.easeOut(duration: 0.25), value: viewModel.dailySpend.isEmpty)
                     .animation(.easeOut(duration: 0.25), value: viewModel.dailyActivity.isEmpty)
                     .padding(16)
                 }
@@ -44,7 +36,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 420)
+        .frame(width: 470)
         .environment(viewModel)
         .onReceive(NotificationCenter.default.publisher(for: NSPopover.willShowNotification)) { _ in
             autoStartEnabled = AutoStartService.isEnabled

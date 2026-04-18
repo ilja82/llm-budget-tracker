@@ -72,7 +72,7 @@ NEXT_BUILD=$((CURRENT_BUILD + 1))
 sed -i '' "s/CURRENT_PROJECT_VERSION: \"[^\"]*\"/CURRENT_PROJECT_VERSION: \"$NEXT_BUILD\"/" project.yml
 
 git add project.yml
-git commit -m "Prepare release $TAG"
+git commit -m "Bump version to $TAG"
 git push origin "$RELEASE_BRANCH"
 
 echo ""
