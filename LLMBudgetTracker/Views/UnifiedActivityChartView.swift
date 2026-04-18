@@ -343,7 +343,7 @@ struct UnifiedActivityChartView: View {
         let id: String
         let date: Date
         let type: String
-        let count: Int
+        let value: Int
     }
 
     private var requestPoints: [RequestPoint] {
@@ -352,9 +352,9 @@ struct UnifiedActivityChartView: View {
             guard let date = Self.localMidnight(from: entry.date) else { continue }
             let metrics = viewModel.metrics(for: entry, model: modelFilter)
             result.append(.init(
-                id: "\(entry.date)-success", date: date, type: "Success", count: metrics.successfulRequests))
+                id: "\(entry.date)-success", date: date, type: "Success", value: metrics.successfulRequests))
             result.append(.init(
-                id: "\(entry.date)-failed", date: date, type: "Failed", count: metrics.failedRequests))
+                id: "\(entry.date)-failed", date: date, type: "Failed", value: metrics.failedRequests))
         }
         return result
     }
@@ -366,8 +366,7 @@ struct UnifiedActivityChartView: View {
         return Chart {
             periodHighlight
             ForEach(points) { point in
-                // swiftlint:disable:next empty_count
-                let displayCount = point.count > 0 ? max(point.count, minRequestBar) : 0
+                let displayCount = point.value > 0 ? max(point.value, minRequestBar) : 0
                 BarMark(
                     x: .value("Date", point.date, unit: .day),
                     y: .value("Requests", displayCount)
@@ -397,8 +396,8 @@ struct UnifiedActivityChartView: View {
 
     private func requestAccessibilityLabel(points: [RequestPoint]) -> String {
         guard !points.isEmpty else { return "No request data available" }
-        let success = points.filter { $0.type == "Success" }.reduce(0) { $0 + $1.count }
-        let failed = points.filter { $0.type == "Failed" }.reduce(0) { $0 + $1.count }
+        let success = points.filter { $0.type == "Success" }.reduce(0) { $0 + $1.value }
+        let failed = points.filter { $0.type == "Failed" }.reduce(0) { $0 + $1.value }
         let days = Set(points.map { Calendar.current.startOfDay(for: $0.date) }).count
         return "API requests over \(days) days. \(success) successful, \(failed) failed."
     }

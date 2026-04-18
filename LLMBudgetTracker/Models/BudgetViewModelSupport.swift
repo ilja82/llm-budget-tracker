@@ -43,10 +43,10 @@ extension BudgetViewModel {
         case .last28:
             cutoffDate = calendar.date(byAdding: .day, value: -27, to: calendar.startOfDay(for: today)) ?? today
         }
-        // Stringify cutoff in local TZ so both sides of the comparison share a basis.
+        // Stringify cutoff in UTC to match the basis used by `DailySpendData.date`.
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
-        fmt.timeZone = .current
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
         let cutoffStr = fmt.string(from: cutoffDate)
         var totals: [String: Double] = [:]
         for entry in dailyActivity where entry.date >= cutoffStr {
