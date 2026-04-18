@@ -129,6 +129,46 @@ struct UnifiedActivityChartView: View {
             }
     }
 
+    // MARK: - Shared scale & highlight
+
+    /// Max daily spend across all models — keeps y-scale fixed when filtering.
+    private var allModelsSpendMax: Double {
+        viewModel.dailyActivity
+            .map { viewModel.metrics(for: $0, model: nil).spend }
+            .max() ?? 0
+    }
+
+    /// Max daily stacked token total across all models.
+    private var allModelsTokenMax: Int {
+        viewModel.dailyActivity.map { entry in
+            let metrics = viewModel.metrics(for: entry, model: nil)
+            return metrics.promptTokens + metrics.completionTokens
+                + metrics.cacheReadInputTokens + metrics.cacheCreationInputTokens
+        }.max() ?? 0
+    }
+
+    /// Max daily stacked request total across all models.
+    private var allModelsRequestMax: Int {
+        viewModel.dailyActivity.map { entry in
+            let metrics = viewModel.metrics(for: entry, model: nil)
+            return metrics.successfulRequests + metrics.failedRequests
+        }.max() ?? 0
+    }
+
+    /// Billing-period highlight. Ends at start-of-tomorrow so today's bar is fully covered.
+    @ChartContentBuilder
+    private var periodHighlight: some ChartContent {
+        let cal = Calendar.current
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date())) ?? Date()
+        if let start = viewModel.currentPeriodStart, start < end {
+            RectangleMark(
+                xStart: .value("Period start", start),
+                xEnd: .value("Period end", end)
+            )
+            .foregroundStyle(Color.accentColor.opacity(0.10))
+        }
+    }
+
     private var spendChart: some View {
         let points = spendPoints
         let safeLine = viewModel.safeSpendLine
@@ -138,21 +178,18 @@ struct UnifiedActivityChartView: View {
             for point in safeLine { dict[cal.startOfDay(for: point.date)] = point.amount }
             return dict
         }()
+        let safeMax = safeLine.map(\.amount).max() ?? 0
+        let spendYMax = max(max(allModelsSpendMax, safeMax) * 1.05, 0.01)
+        let minBarAmount = spendYMax * 0.005
         return Chart {
-            if let start = viewModel.currentPeriodStart,
-               let last = points.map(\.date).max(),
-               start <= last {
-                RectangleMark(
-                    xStart: .value("Period start", start),
-                    xEnd: .value("Period end", last)
-                )
-                .foregroundStyle(Color.accentColor.opacity(0.10))
-            }
+            periodHighlight
 
             ForEach(points) { point in
+                // Floor non-zero bars to a visible minimum so activity is never rendered as empty.
+                let displayAmount = point.amount > 0 ? max(point.amount, minBarAmount) : 0
                 BarMark(
                     x: .value("Date", point.date, unit: .day),
-                    y: .value("Spend ($)", point.amount)
+                    y: .value("Spend ($)", displayAmount)
                 )
                 .foregroundStyle(barColor(for: point, safeLimitByDay: safeLimitByDay))
                 .cornerRadius(2)
@@ -194,6 +231,7 @@ struct UnifiedActivityChartView: View {
                 }
             }
         }
+        .chartYScale(domain: 0 ... spendYMax)
         .frame(height: 180)
         .accessibilityLabel(spendAccessibilityLabel(points: points))
     }
@@ -247,20 +285,15 @@ struct UnifiedActivityChartView: View {
 
     private var tokensChart: some View {
         let points = tokenPoints
+        let tokenYMax = max(allModelsTokenMax, 1)
+        let minTokenBar = max(Int((Double(tokenYMax) * 0.005).rounded(.up)), 1)
         return Chart {
-            if let start = viewModel.currentPeriodStart,
-               let last = points.map(\.date).max(),
-               start <= last {
-                RectangleMark(
-                    xStart: .value("Period start", start),
-                    xEnd: .value("Period end", last)
-                )
-                .foregroundStyle(Color.accentColor.opacity(0.10))
-            }
+            periodHighlight
             ForEach(points) { point in
+                let displayTokens = point.tokens > 0 ? max(point.tokens, minTokenBar) : 0
                 BarMark(
                     x: .value("Date", point.date, unit: .day),
-                    y: .value("Tokens", point.tokens)
+                    y: .value("Tokens", displayTokens)
                 )
                 .foregroundStyle(by: .value("Type", point.type))
             }
@@ -275,6 +308,7 @@ struct UnifiedActivityChartView: View {
                 }
             }
         }
+        .chartYScale(domain: 0 ... tokenYMax)
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 180)
         .accessibilityLabel(tokenAccessibilityLabel(points: points))
@@ -318,20 +352,16 @@ struct UnifiedActivityChartView: View {
 
     private var requestsChart: some View {
         let points = requestPoints
+        let requestYMax = max(allModelsRequestMax, 1)
+        let minRequestBar = max(Int((Double(requestYMax) * 0.005).rounded(.up)), 1)
         return Chart {
-            if let start = viewModel.currentPeriodStart,
-               let last = points.map(\.date).max(),
-               start <= last {
-                RectangleMark(
-                    xStart: .value("Period start", start),
-                    xEnd: .value("Period end", last)
-                )
-                .foregroundStyle(Color.accentColor.opacity(0.10))
-            }
+            periodHighlight
             ForEach(points) { point in
+                // swiftlint:disable:next empty_count
+                let displayCount = point.count > 0 ? max(point.count, minRequestBar) : 0
                 BarMark(
                     x: .value("Date", point.date, unit: .day),
-                    y: .value("Requests", point.count)
+                    y: .value("Requests", displayCount)
                 )
                 .foregroundStyle(by: .value("Type", point.type))
             }
@@ -350,6 +380,7 @@ struct UnifiedActivityChartView: View {
                 }
             }
         }
+        .chartYScale(domain: 0 ... requestYMax)
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 180)
         .accessibilityLabel(requestAccessibilityLabel(points: points))

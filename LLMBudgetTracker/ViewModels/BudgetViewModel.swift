@@ -153,8 +153,13 @@ final class BudgetViewModel {
     var currentPeriodStart: Date? {
         guard let info = budgetInfo, let resetAt = info.budgetResetAt,
               let dur = info.budgetDuration, let days = parseDurationDays(dur) else { return nil }
-        let cal = Calendar.current
-        return cal.startOfDay(for: cal.date(byAdding: .day, value: -days, to: resetAt) ?? Date())
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        guard let utcStart = utcCal.date(byAdding: .day, value: -days, to: resetAt) else { return nil }
+        // Map UTC Y-M-D to local midnight so it aligns with local-day bar buckets
+        // and with dateComponents([.day], from:to:) using Calendar.current downstream.
+        let components = utcCal.dateComponents([.year, .month, .day], from: utcStart)
+        return Calendar.current.date(from: components)
     }
 
     private func computeSafeSpendLine() -> [(date: Date, amount: Double)] {
