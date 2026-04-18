@@ -344,14 +344,15 @@ struct BudgetBar: View {
         HStack(spacing: 5) {
             Group {
                 if dashed {
-                    Rectangle()
-                        .fill(color)
-                        .frame(width: 12, height: 1.5)
-                        .overlay(
-                            Rectangle()
-                                .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
-                                .foregroundStyle(color)
-                        )
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: 0.75))
+                        path.addLine(to: CGPoint(x: 12, y: 0.75))
+                    }
+                    .stroke(
+                        color,
+                        style: StrokeStyle(lineWidth: 1.5, lineCap: .butt, dash: [3, 2])
+                    )
+                    .frame(width: 12, height: 1.5)
                 } else {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(color)
