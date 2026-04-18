@@ -27,9 +27,6 @@ struct UnifiedActivityChartView: View {
                 controlsRow
                 chartBody
             }
-        } label: {
-            Label("Activity", systemImage: "chart.bar.xaxis")
-                .font(.caption.weight(.semibold))
         }
     }
 
@@ -46,7 +43,9 @@ struct UnifiedActivityChartView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .controlSize(.small)
             .labelsHidden()
+            .opacity(0.85)
 
             Spacer(minLength: 8)
 

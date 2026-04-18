@@ -15,9 +15,6 @@ struct ModelSpendBreakdownChartView: View {
                 rangePicker
                 chartBody
             }
-        } label: {
-            Label("Spend by Model", systemImage: "square.stack.3d.up")
-                .font(.caption.weight(.semibold))
         }
     }
 
@@ -31,7 +28,9 @@ struct ModelSpendBreakdownChartView: View {
             }
         }
         .pickerStyle(.segmented)
+        .controlSize(.small)
         .labelsHidden()
+        .opacity(0.85)
     }
 
     @ViewBuilder

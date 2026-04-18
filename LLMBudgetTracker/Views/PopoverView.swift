@@ -36,7 +36,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 420)
+        .frame(width: 470)
         .environment(viewModel)
         .onReceive(NotificationCenter.default.publisher(for: NSPopover.willShowNotification)) { _ in
             autoStartEnabled = AutoStartService.isEnabled
