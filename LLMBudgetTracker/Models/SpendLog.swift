@@ -113,9 +113,55 @@ struct SpendMetrics: Codable {
     }
 }
 
+struct ModelGroupBreakdown: Codable {
+    let metrics: SpendMetrics
+
+    init(metrics: SpendMetrics) {
+        self.metrics = metrics
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        metrics = (try? container.decode(SpendMetrics.self, forKey: .metrics)) ?? SpendMetrics()
+    }
+
+    enum CodingKeys: String, CodingKey { case metrics }
+}
+
+struct DailyBreakdown: Codable {
+    let modelGroups: [String: ModelGroupBreakdown]
+
+    init(modelGroups: [String: ModelGroupBreakdown]) {
+        self.modelGroups = modelGroups
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        modelGroups = (try? container.decode([String: ModelGroupBreakdown].self, forKey: .modelGroups)) ?? [:]
+    }
+
+    enum CodingKeys: String, CodingKey { case modelGroups = "model_groups" }
+}
+
 struct DailySpendData: Codable {
     let date: String       // "yyyy-MM-dd"
     let metrics: SpendMetrics
+    let breakdown: DailyBreakdown?
+
+    init(date: String, metrics: SpendMetrics, breakdown: DailyBreakdown? = nil) {
+        self.date = date
+        self.metrics = metrics
+        self.breakdown = breakdown
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = (try? container.decode(String.self, forKey: .date)) ?? ""
+        metrics = (try? container.decode(SpendMetrics.self, forKey: .metrics)) ?? SpendMetrics()
+        breakdown = try? container.decode(DailyBreakdown.self, forKey: .breakdown)
+    }
+
+    enum CodingKeys: String, CodingKey { case date, metrics, breakdown }
 
     /// Convert to SpendLog so downstream consumers (charts, pacing) are unchanged.
     func toSpendLog() -> SpendLog? {

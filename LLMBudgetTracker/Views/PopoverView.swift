@@ -21,29 +21,14 @@ struct PopoverView: View {
                 ScrollView {
                     VStack(spacing: 10) {
                         StatsView()
-                        if !viewModel.dailySpend.isEmpty {
-                            UsageChartView(
-                                data: viewModel.dailySpend,
-                                safeLine: viewModel.safeSpendLine,
-                                currentPeriodStart: viewModel.currentPeriodStart
-                            )
-                            .transition(.opacity)
-                        }
                         if !viewModel.dailyActivity.isEmpty {
-                            TokenChartView(
-                                data: viewModel.dailyActivity,
-                                currentPeriodStart: viewModel.currentPeriodStart
-                            )
-                            .transition(.opacity)
-                            RequestsChartView(
-                                data: viewModel.dailyActivity,
-                                currentPeriodStart: viewModel.currentPeriodStart
-                            )
-                            .transition(.opacity)
+                            UnifiedActivityChartView()
+                                .transition(.opacity)
+                            ModelSpendBreakdownChartView()
+                                .transition(.opacity)
                         }
                         secondaryControlsSection
                     }
-                    .animation(.easeOut(duration: 0.25), value: viewModel.dailySpend.isEmpty)
                     .animation(.easeOut(duration: 0.25), value: viewModel.dailyActivity.isEmpty)
                     .padding(16)
                 }

@@ -460,38 +460,7 @@ final class BudgetViewModel {
     }
 
     private func generateFakeDailyActivity(daysPassed: Int, totalSpend: Double) -> [DailySpendData] {
-        guard daysPassed > 0 else { return [] }
-        let fmt = Self.dailyFmt
-        let weights = (0..<daysPassed).map { _ in Double.random(in: 0.5...1.5) }
-        let totalWeight = max(weights.reduce(0, +), 0.0001)
-
-        return (0..<daysPassed).map { i in
-            let daysBack = daysPassed - i - 1
-            let date = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-            let spend = totalSpend > 0
-                ? max(0.001, totalSpend * (weights[i] / totalWeight))
-                : totalSpend / Double(daysPassed)
-            let prompt = Int.random(in: 500...5000)
-            let completion = Int.random(in: 100...1000)
-            let cacheRead = Int.random(in: 0...2000)
-            let cacheWrite = Int.random(in: 0...500)
-            let success = Int.random(in: 5...40)
-            let failed = Int.random(in: 0...3)
-            return DailySpendData(
-                date: fmt.string(from: date),
-                metrics: SpendMetrics(
-                    spend: spend,
-                    promptTokens: prompt,
-                    completionTokens: completion,
-                    cacheReadInputTokens: cacheRead,
-                    cacheCreationInputTokens: cacheWrite,
-                    totalTokens: prompt + completion + cacheRead + cacheWrite,
-                    successfulRequests: success,
-                    failedRequests: failed,
-                    apiRequests: success + failed
-                )
-            )
-        }
+        FakeDailyActivity.generate(daysPassed: daysPassed, totalSpend: totalSpend)
     }
 
     // MARK: - Helpers
