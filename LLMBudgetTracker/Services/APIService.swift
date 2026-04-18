@@ -4,6 +4,7 @@ actor APIService {
     private enum Constants {
         static let apiKeyHeaderField: String = "x-litellm-api-key"
         static let requestTimeoutSeconds: TimeInterval = 15
+        static let resourceTimeoutSeconds: TimeInterval = 30
         static let defaultPage: String = "1"
         static let defaultPageSize: String = "32"
         static let maximumResponseLogBytes: Int = 4_096
@@ -37,7 +38,7 @@ actor APIService {
     init() {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = Constants.requestTimeoutSeconds
-        configuration.timeoutIntervalForResource = Constants.requestTimeoutSeconds
+        configuration.timeoutIntervalForResource = Constants.resourceTimeoutSeconds
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil

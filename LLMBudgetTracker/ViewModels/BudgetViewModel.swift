@@ -743,13 +743,12 @@ final class BudgetViewModel {
 
     private func startTimer() {
         timerTask = Task { [weak self] in
-            guard let self else { return }
-            await self.refresh()
+            await self?.refresh()
             while !Task.isCancelled {
-                let interval = self.updateIntervalMinutes
+                let interval = self?.updateIntervalMinutes ?? 60
                 try? await Task.sleep(for: .seconds(Double(interval) * 60))
-                guard !Task.isCancelled else { break }
-                await self.refresh()
+                if Task.isCancelled { break }
+                await self?.refresh()
             }
         }
     }

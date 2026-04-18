@@ -34,7 +34,7 @@ struct UnifiedActivityChartView: View {
 
     private var controlsRow: some View {
         HStack(spacing: 8) {
-            Picker("", selection: Binding(
+            Picker("Metric", selection: Binding(
                 get: { metric },
                 set: { metricRaw = $0.rawValue }
             )) {

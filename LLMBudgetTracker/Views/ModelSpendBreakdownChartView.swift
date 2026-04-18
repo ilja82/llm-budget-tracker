@@ -19,7 +19,7 @@ struct ModelSpendBreakdownChartView: View {
     }
 
     private var rangePicker: some View {
-        Picker("", selection: Binding(
+        Picker("Range", selection: Binding(
             get: { range },
             set: { rangeRaw = $0.rawValue }
         )) {
