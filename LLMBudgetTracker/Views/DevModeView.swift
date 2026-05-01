@@ -451,7 +451,7 @@ private struct RequestDetailView: View {
                                 .buttonStyle(.plain)
                                 .foregroundStyle(Color.accentColor)
                             }
-                            Text(log.responseBody)
+                            Text(ResponseSanitizer.truncatedForDisplay(log.responseBody))
                                 .font(.caption2)
                                 .monospaced()
                                 .textSelection(.enabled)
