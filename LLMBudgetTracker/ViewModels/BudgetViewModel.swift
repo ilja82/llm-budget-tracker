@@ -661,8 +661,8 @@ final class BudgetViewModel {
             cursor = next
         }
 
-        let cutoff = Calendar.current.date(byAdding: .day, value: -62, to: today) ?? today
-        let cutoffStr = Self.dailyFmt.string(from: cutoff)
+        let cutoff = utcCal.date(byAdding: .day, value: -62, to: today) ?? today
+        let cutoffStr = fmt.string(from: cutoff)
         let result = merged.values
             .filter { $0.date >= cutoffStr }
             .sorted { $0.date < $1.date }

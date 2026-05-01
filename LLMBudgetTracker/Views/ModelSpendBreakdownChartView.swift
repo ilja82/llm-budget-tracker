@@ -7,7 +7,7 @@ struct ModelSpendBreakdownChartView: View {
 
     private enum Layout {
         static let rowHeight: CGFloat = 26
-        static let compactThreshold = 8
+        static let compactThreshold = 5
         static let axisOverhead: CGFloat = 28
         static let compactHeight: CGFloat = 180
         static var maxVisibleRows: Int {
