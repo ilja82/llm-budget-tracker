@@ -572,7 +572,7 @@ final class BudgetViewModel {
                 )
             }
 
-            let result = mergeAndPersistActivity(cache: cache, fetched: fetched, today: today)
+            let result = mergeAndPersistActivity(cache: cache, fetched: fetched, startDate: startDate, today: today)
             dailyActivity = result
             spendLogs = result.compactMap { $0.toSpendLog() }
 
@@ -638,11 +638,29 @@ final class BudgetViewModel {
     private func mergeAndPersistActivity(
         cache: [DailySpendData],
         fetched: [DailySpendData],
+        startDate: Date,
         today: Date
     ) -> [DailySpendData] {
         var merged: [String: DailySpendData] = [:]
         for entry in cache where !entry.date.isEmpty { merged[entry.date] = entry }
         for entry in fetched where !entry.date.isEmpty { merged[entry.date] = entry }
+
+        // API omits days with zero usage; pad missing UTC days in [startDate, today]
+        // so chart and cache stay continuous. Cache/fetched entries take precedence.
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let fmt = Self.dailyFmt
+        var cursor = utcCal.startOfDay(for: startDate)
+        let end = utcCal.startOfDay(for: today)
+        while cursor <= end {
+            let key = fmt.string(from: cursor)
+            if merged[key] == nil {
+                merged[key] = DailySpendData(date: key, metrics: SpendMetrics(), breakdown: nil)
+            }
+            guard let next = utcCal.date(byAdding: .day, value: 1, to: cursor) else { break }
+            cursor = next
+        }
+
         let cutoff = Calendar.current.date(byAdding: .day, value: -62, to: today) ?? today
         let cutoffStr = Self.dailyFmt.string(from: cutoff)
         let result = merged.values
