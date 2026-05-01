@@ -7,7 +7,6 @@ actor APIService {
         static let resourceTimeoutSeconds: TimeInterval = 30
         static let defaultPage: String = "1"
         static let defaultPageSize: String = "32"
-        static let maximumResponseLogBytes: Int = 4_096
     }
 
     // DateFormatter is not thread-safe: keep as actor-isolated instance property
@@ -133,7 +132,7 @@ actor APIService {
     }
 
     private func sanitizedLogBody(from data: Data) -> String {
-        ResponseSanitizer.sanitize(data: data, maxLength: Constants.maximumResponseLogBytes)
+        ResponseSanitizer.sanitize(data: data)
     }
 }
 
