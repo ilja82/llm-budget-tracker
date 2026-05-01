@@ -243,6 +243,7 @@ final class BudgetViewModel {
         f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
+    private static let refetchGraceDays = 2
     private static let iso8601Display = ISO8601DateFormatter()
 
     init() {
@@ -544,15 +545,7 @@ final class BudgetViewModel {
         let today = Date()
         let cache = loadCachedActivity()
 
-        let startDate: Date
-        if cache.isEmpty {
-            startDate = Calendar.current.date(byAdding: .day, value: -32, to: today) ?? today
-        } else {
-            let lastDateStr = cache.map(\.date).max() ?? ""
-            startDate = fmt.date(from: lastDateStr)
-                ?? Calendar.current.date(byAdding: .day, value: -32, to: today)
-                ?? today
-        }
+        let startDate = Self.computeFetchStartDate(today: today, cache: cache)
 
         let queryParams: [String: String] = [
             "user_id": info.userId,
@@ -600,6 +593,17 @@ final class BudgetViewModel {
                 dailyActivity = []
             }
         }
+    }
+
+    private static func computeFetchStartDate(today: Date, cache: [DailySpendData]) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let floor = cal.date(byAdding: .day, value: -32, to: today) ?? today
+        guard !cache.isEmpty else { return floor }
+        let lastDateStr = cache.map(\.date).max() ?? ""
+        let cacheMax = dailyFmt.date(from: lastDateStr) ?? floor
+        let grace = cal.date(byAdding: .day, value: -refetchGraceDays, to: cacheMax) ?? cacheMax
+        return max(grace, floor)
     }
 
     private func loadCachedActivity() -> [DailySpendData] {
