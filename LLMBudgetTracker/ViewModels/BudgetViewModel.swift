@@ -596,7 +596,8 @@ final class BudgetViewModel {
     }
 
     private static func computeFetchStartDate(today: Date, cache: [DailySpendData]) -> Date {
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
         let floor = cal.date(byAdding: .day, value: -32, to: today) ?? today
         guard !cache.isEmpty else { return floor }
         let lastDateStr = cache.map(\.date).max() ?? ""
