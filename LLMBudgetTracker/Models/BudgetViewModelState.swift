@@ -8,6 +8,7 @@ enum AppLoadState: Equatable {
     case rateLimited
     case authError
     case networkError
+    case offline
     case invalidData
     case noBudget
     case unknownError

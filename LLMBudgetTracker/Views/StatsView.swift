@@ -46,6 +46,15 @@ struct StatsView: View {
                     message: "LLM Budget Tracker could not reach your LiteLLM proxy." +
                         " Check the Proxy URL and your network connection."
                 )
+            case .offline:
+                if let info = viewModel.budgetInfo {
+                    VStack(alignment: .leading, spacing: 10) {
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        offlineCard
+                    }
+                } else {
+                    offlineCard
+                }
             case .invalidData:
                 errorCard(
                     title: "Invalid response data",
@@ -68,6 +77,25 @@ struct StatsView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.appState)
+    }
+
+    private var offlineCard: some View {
+        GroupBox {
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "wifi.slash")
+                        .foregroundStyle(.secondary)
+                    Text("Waiting for connection…")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
+                Text("LLM Budget Tracker will refresh automatically once you're back online.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.vertical, 4)
+        }
     }
 
     private func errorCard(title: String, message: String) -> some View {

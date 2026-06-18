@@ -130,17 +130,27 @@ struct ModelGroupBreakdown: Codable {
 
 struct DailyBreakdown: Codable {
     let modelGroups: [String: ModelGroupBreakdown]
+    let models: [String: ModelGroupBreakdown]
 
-    init(modelGroups: [String: ModelGroupBreakdown]) {
+    /// Per-model breakdown to display. `models` and `model_groups` are alternate
+    /// views of the same spend, so prefer the complete `models` and never sum both.
+    var perModel: [String: ModelGroupBreakdown] { models.isEmpty ? modelGroups : models }
+
+    init(modelGroups: [String: ModelGroupBreakdown], models: [String: ModelGroupBreakdown] = [:]) {
         self.modelGroups = modelGroups
+        self.models = models
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         modelGroups = (try? container.decode([String: ModelGroupBreakdown].self, forKey: .modelGroups)) ?? [:]
+        models = (try? container.decode([String: ModelGroupBreakdown].self, forKey: .models)) ?? [:]
     }
 
-    enum CodingKeys: String, CodingKey { case modelGroups = "model_groups" }
+    enum CodingKeys: String, CodingKey {
+        case modelGroups = "model_groups"
+        case models
+    }
 }
 
 struct DailySpendData: Codable {

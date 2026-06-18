@@ -6,7 +6,7 @@ enum DiagnosticLoggingMode {
 }
 
 struct CachedActivityEnvelope: Codable {
-    static let currentVersion = 2
+    static let currentVersion = 3
     let version: Int
     let items: [DailySpendData]
 }
@@ -19,7 +19,7 @@ extension BudgetViewModel {
     var availableModelGroups: [String] {
         var seen: Set<String> = []
         for entry in dailyActivity {
-            guard let groups = entry.breakdown?.modelGroups else { continue }
+            guard let groups = entry.breakdown?.perModel else { continue }
             for key in groups.keys { seen.insert(key) }
         }
         return seen.sorted()
@@ -29,7 +29,7 @@ extension BudgetViewModel {
     /// nil model → top-level metrics. Missing model-group on a given day → zeros.
     func metrics(for entry: DailySpendData, model: String?) -> SpendMetrics {
         guard let model else { return entry.metrics }
-        return entry.breakdown?.modelGroups[model]?.metrics ?? SpendMetrics()
+        return entry.breakdown?.perModel[model]?.metrics ?? SpendMetrics()
     }
 
     /// Summed spend per model-group across `range`, ranked descending.
@@ -59,7 +59,7 @@ extension BudgetViewModel {
         )
         var totals: [String: Double] = [:]
         for entry in dailyActivity where entry.date >= cutoffStr {
-            guard let groups = entry.breakdown?.modelGroups else { continue }
+            guard let groups = entry.breakdown?.perModel else { continue }
             for (name, group) in groups {
                 totals[name, default: 0] += group.metrics.spend
             }
