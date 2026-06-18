@@ -41,7 +41,7 @@ actor APIService {
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
-        configuration.waitsForConnectivity = false
+        configuration.waitsForConnectivity = true
         session = URLSession(configuration: configuration)
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in

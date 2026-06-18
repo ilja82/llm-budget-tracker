@@ -61,7 +61,7 @@ final class BudgetViewModel {
 
     var pacingStatus: PacingStatus {
         switch appState {
-        case .authError, .networkError, .invalidData, .noBudget, .rateLimited, .unknownError, .notConfigured:
+        case .authError, .networkError, .offline, .invalidData, .noBudget, .rateLimited, .unknownError, .notConfigured:
             return .unknown
         default:
             return pacingInfo?.status ?? .unknown
@@ -69,6 +69,7 @@ final class BudgetViewModel {
     }
 
     var menuBarText: String {
+        if appState == .offline, budgetInfo == nil { return "⏳" }
         guard let info = budgetInfo else { return "$--" }
         switch displayMode {
         case .dollar:
@@ -89,6 +90,8 @@ final class BudgetViewModel {
             return "Rate limited\n\(rateLimitMessage)"
         case .networkError:
             return "Server unreachable\nCheck your Proxy URL and network."
+        case .offline:
+            return "Waiting for connection…\nWill refresh automatically once you're back online."
         case .invalidData:
             return "Invalid response data\nCheck your LiteLLM proxy."
         case .noBudget:
@@ -232,7 +235,8 @@ final class BudgetViewModel {
         return .disabled
         #endif
     }()
-    @ObservationIgnored private var timerTask: Task<Void, Never>?
+    @ObservationIgnored var timerTask: Task<Void, Never>?
+    @ObservationIgnored let networkMonitor = NetworkMonitor()
 
     @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]?
     @ObservationIgnored private var _safeSpendLine: [(date: Date, amount: Double)]?
@@ -252,6 +256,7 @@ final class BudgetViewModel {
             dailyActivity = cached
             spendLogs = cached.compactMap { $0.toSpendLog() }
         }
+        setupNetworkMonitor()
         startTimer()
     }
 
@@ -293,7 +298,7 @@ final class BudgetViewModel {
             return
         }
         guard !isLoading else { return }
-        appState = budgetInfo == nil ? .loading : .refreshing
+        appState = inProgressState()
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -381,8 +386,11 @@ final class BudgetViewModel {
             case .httpError: appState = .networkError
             case .invalidURL: appState = .networkError
             }
+        } else if (error as NSError).domain == NSURLErrorDomain {
+            // No connectivity → "offline"; route up but request failed → "network".
+            appState = networkMonitor.isConnected ? .networkError : .offline
         } else {
-            appState = (error as NSError).domain == NSURLErrorDomain ? .networkError : .unknownError
+            appState = .unknownError
         }
         errorMessage = error.localizedDescription
     }
@@ -767,21 +775,14 @@ final class BudgetViewModel {
         return 30
     }
 
-    private func startTimer() {
-        timerTask = Task { [weak self] in
-            await self?.refresh()
-            while !Task.isCancelled {
-                let interval = self?.updateIntervalMinutes ?? 60
-                try? await Task.sleep(for: .seconds(Double(interval) * 60))
-                if Task.isCancelled { break }
-                await self?.refresh()
-            }
+    /// Shows `.offline` unless a more important state is visible (setter is file-private here).
+    func enterOfflineStateIfNeeded() {
+        switch appState {
+        case .notConfigured, .authError, .rateLimited:
+            return
+        default:
+            appState = .offline
         }
-    }
-
-    private func restartTimer() {
-        timerTask?.cancel()
-        startTimer()
     }
 
     private func sanitizeQueryParams(_ params: [String: String]) -> [String: String] {

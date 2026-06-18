@@ -106,6 +106,8 @@ final class StatusBarController {
             return "Requests paused"
         case .networkError:
             return "Server unreachable"
+        case .offline:
+            return "Waiting for connection"
         case .invalidData:
             return "Invalid response data"
         case .noBudget:
