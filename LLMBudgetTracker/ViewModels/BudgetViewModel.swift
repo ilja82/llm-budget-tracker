@@ -401,7 +401,7 @@ final class BudgetViewModel {
         guard (try? EndpointSecurity.normalizedBaseURLString(from: url)) != nil else { return .invalidURL }
         do {
             let normalizedURL = try EndpointSecurity.normalizedBaseURLString(from: url)
-            _ = try await api.fetchBudgetInfo(baseURL: normalizedURL, apiKey: apiKey)
+            _ = try await api.fetchResolvedBudgetInfo(baseURL: normalizedURL, apiKey: apiKey)
             return .connected
         } catch let error as APIError {
             switch error {

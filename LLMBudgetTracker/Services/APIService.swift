@@ -70,13 +70,24 @@ actor APIService {
     func fetchResolvedBudgetInfo(baseURL: String, apiKey: String) async throws -> BudgetFetchResult {
         let keyInfo = try await fetchKeyInfo(baseURL: baseURL, apiKey: apiKey)
         if let teamId = keyInfo.teamId, !teamId.isEmpty {
-            let (info, json, status) = try await fetchTeamMemberBudget(
-                baseURL: baseURL, apiKey: apiKey, teamId: teamId
-            )
-            return BudgetFetchResult(
-                info: info, rawJSON: json, statusCode: status,
-                endpoint: "/team/\(teamId)/members/me", keyInfo: keyInfo
-            )
+            do {
+                let (info, json, status) = try await fetchTeamMemberBudget(
+                    baseURL: baseURL, apiKey: apiKey, teamId: teamId
+                )
+                return BudgetFetchResult(
+                    info: info, rawJSON: json, statusCode: status,
+                    endpoint: "/team/\(teamId)/members/me", keyInfo: keyInfo
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch is APIError {
+                // Team endpoint unavailable/forbidden on this proxy → fall through to the
+                // user-level budget rather than a misleading auth/network error. A genuine
+                // bad key re-surfaces below: /v2/user/info will also 401.
+            } catch is DecodingError {
+                // Unexpected team-member shape → fall through to user-level budget.
+            }
+            // Transport errors (offline) propagate from the do-block above — no second request.
         }
         let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
         return BudgetFetchResult(
@@ -85,15 +96,19 @@ actor APIService {
     }
 
     /// Fetches the calling key's own info to detect team attachment, plus the raw
-    /// body + status for the request log. The /key/info body is untyped server-side,
-    /// so a decode miss yields teamId == nil ("no team"); HTTP errors still propagate.
+    /// body + status for the request log. Team detection is best-effort: a non-2xx or
+    /// undecodable /key/info yields teamId == nil ("no team") so the caller falls through
+    /// to /v2/user/info instead of failing the whole refresh. Only transport errors
+    /// (offline) propagate.
     func fetchKeyInfo(baseURL: String, apiKey: String) async throws -> KeyInfoFetch {
         let url = try endpoint(base: baseURL, path: "/key/info")
         let request = authenticatedRequest(url: url, apiKey: apiKey)
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode
-        try validate(response)
-        let teamId = (try? decoder.decode(KeyInfoResponse.self, from: data))?.info?.teamId
+        let teamId: String? = {
+            if let code = statusCode, !(200..<300).contains(code) { return nil }
+            return (try? decoder.decode(KeyInfoResponse.self, from: data))?.info?.teamId
+        }()
         return KeyInfoFetch(teamId: teamId, rawJSON: sanitizedLogBody(from: data), statusCode: statusCode)
     }
 
