@@ -299,10 +299,10 @@ final class BudgetViewModel {
         defer { isLoading = false }
 
         do {
-            let (info, json, status) = try await withRetry {
-                try await api.fetchBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
+            let result = try await withRetry {
+                try await api.fetchResolvedBudgetInfo(baseURL: endpointURL, apiKey: apiKey)
             }
-            await handleBudgetSuccess(info: info, rawJSON: json, statusCode: status, apiKey: apiKey)
+            await handleBudgetSuccess(result: result, apiKey: apiKey)
         } catch is CancellationError {
             return
         } catch {
@@ -321,14 +321,20 @@ final class BudgetViewModel {
         await refresh()
     }
 
-    private func handleBudgetSuccess(
-        info: BudgetInfo, rawJSON: String, statusCode: Int?, apiKey: String
-    ) async {
+    private func handleBudgetSuccess(result: BudgetFetchResult, apiKey: String) async {
+        let info = result.info
         rateLimitedUntil = nil
         logAPIRequest(
-            endpoint: "/v2/user/info",
-            statusCode: statusCode,
-            responseBody: rawJSON,
+            endpoint: "/key/info",
+            statusCode: result.keyInfo.statusCode,
+            responseBody: result.keyInfo.rawJSON,
+            errorMessage: nil,
+            extractedFields: [.init(name: "team_id", value: result.keyInfo.teamId ?? "nil")]
+        )
+        logAPIRequest(
+            endpoint: result.endpoint,
+            statusCode: result.statusCode,
+            responseBody: result.rawJSON,
             errorMessage: nil,
             extractedFields: budgetInfoFields(info)
         )
@@ -715,17 +721,11 @@ final class BudgetViewModel {
             .init(name: "user_id", value: maskIdentifier(info.userId)),
             .init(name: "spend", value: String(format: "$%.4f", info.spend))
         ]
-        if let max = info.maxBudget {
-            fields.append(.init(name: "max_budget", value: String(format: "$%.2f", max)))
-        } else {
-            fields.append(.init(name: "max_budget", value: "nil"))
-        }
+        fields.append(.init(name: "max_budget",
+                            value: info.maxBudget.map { String(format: "$%.2f", $0) } ?? "nil"))
         fields.append(.init(name: "budget_duration", value: info.budgetDuration ?? "nil"))
-        if let reset = info.budgetResetAt {
-            fields.append(.init(name: "budget_reset_at", value: Self.iso8601Display.string(from: reset)))
-        } else {
-            fields.append(.init(name: "budget_reset_at", value: "nil"))
-        }
+        fields.append(.init(name: "budget_reset_at",
+                            value: info.budgetResetAt.map { Self.iso8601Display.string(from: $0) } ?? "nil"))
         fields.append(.init(name: "user_email", value: info.userEmail == nil ? "nil" : "[REDACTED]"))
         return fields
     }

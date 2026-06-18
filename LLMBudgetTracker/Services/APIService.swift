@@ -64,6 +64,57 @@ actor APIService {
         return (try decoder.decode(BudgetInfo.self, from: data), rawJSON, statusCode)
     }
 
+    /// Resolves the budget for the calling key. If the key is attached to a team,
+    /// LiteLLM tracks its budget per team-member (GET /team/{team_id}/members/me);
+    /// otherwise the user-level budget is used (GET /v2/user/info).
+    func fetchResolvedBudgetInfo(baseURL: String, apiKey: String) async throws -> BudgetFetchResult {
+        let keyInfo = try await fetchKeyInfo(baseURL: baseURL, apiKey: apiKey)
+        if let teamId = keyInfo.teamId, !teamId.isEmpty {
+            let (info, json, status) = try await fetchTeamMemberBudget(
+                baseURL: baseURL, apiKey: apiKey, teamId: teamId
+            )
+            return BudgetFetchResult(
+                info: info, rawJSON: json, statusCode: status,
+                endpoint: "/team/\(teamId)/members/me", keyInfo: keyInfo
+            )
+        }
+        let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
+        return BudgetFetchResult(
+            info: info, rawJSON: json, statusCode: status, endpoint: "/v2/user/info", keyInfo: keyInfo
+        )
+    }
+
+    /// Fetches the calling key's own info to detect team attachment, plus the raw
+    /// body + status for the request log. The /key/info body is untyped server-side,
+    /// so a decode miss yields teamId == nil ("no team"); HTTP errors still propagate.
+    func fetchKeyInfo(baseURL: String, apiKey: String) async throws -> KeyInfoFetch {
+        let url = try endpoint(base: baseURL, path: "/key/info")
+        let request = authenticatedRequest(url: url, apiKey: apiKey)
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode
+        try validate(response)
+        let teamId = (try? decoder.decode(KeyInfoResponse.self, from: data))?.info?.teamId
+        return KeyInfoFetch(teamId: teamId, rawJSON: sanitizedLogBody(from: data), statusCode: statusCode)
+    }
+
+    /// Fetches the caller's own per-team-member budget row (spend + max budget),
+    /// mapped onto BudgetInfo. Source: GET /team/{team_id}/members/me.
+    func fetchTeamMemberBudget(
+        baseURL: String,
+        apiKey: String,
+        teamId: String
+    // swiftlint:disable:next large_tuple
+    ) async throws -> (BudgetInfo, String, Int?) {
+        let url = try endpoint(base: baseURL, path: "/team/\(teamId)/members/me")
+        let request = authenticatedRequest(url: url, apiKey: apiKey)
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode
+        try validate(response)
+        let rawJSON = sanitizedLogBody(from: data)
+        let member = try decoder.decode(TeamMemberInfoResponse.self, from: data)
+        return (member.toBudgetInfo(), rawJSON, statusCode)
+    }
+
     func fetchDailyActivity(
         baseURL: String,
         apiKey: String,
@@ -134,6 +185,22 @@ actor APIService {
     private func sanitizedLogBody(from data: Data) -> String {
         ResponseSanitizer.sanitize(data: data)
     }
+}
+
+/// Resolved budget plus the endpoint it was read from (for request logging).
+struct BudgetFetchResult: Sendable {
+    let info: BudgetInfo
+    let rawJSON: String
+    let statusCode: Int?
+    let endpoint: String
+    let keyInfo: KeyInfoFetch
+}
+
+/// The /key/info exchange: detected team plus raw body + status for the request log.
+struct KeyInfoFetch: Sendable {
+    let teamId: String?
+    let rawJSON: String
+    let statusCode: Int?
 }
 
 enum APIError: LocalizedError {
