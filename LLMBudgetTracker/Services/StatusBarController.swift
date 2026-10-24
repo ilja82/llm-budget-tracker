@@ -111,7 +111,7 @@ final class StatusBarController {
         case .invalidData:
             return "Invalid response data"
         case .noBudget:
-            return "No budget available"
+            return "Used \(viewModel.menuBarText), no budget limit"
         case .unknownError:
             return "Unknown error"
         case .loading:

@@ -49,6 +49,7 @@ targets:
       - path: LLMBudgetTracker/Models/BudgetInfo.swift
       - path: LLMBudgetTracker/Models/TeamMemberInfo.swift
       - path: LLMBudgetTracker/Models/KeyInfo.swift
+      - path: LLMBudgetTracker/Models/TeamInfo.swift
       - path: LLMBudgetTracker/Models/SpendLog.swift
       - path: LLMBudgetTracker/Models/ChartSelection.swift
     settings:
