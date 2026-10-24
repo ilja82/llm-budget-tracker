@@ -101,9 +101,11 @@ struct UnifiedActivityChartView: View {
                     Image(systemName: "chevron.down")
                         .font(.caption2)
                 }
-                .font(.caption)
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .controlSize(.small)
+            .opacity(0.85)
             .fixedSize()
         }
     }
