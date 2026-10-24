@@ -42,6 +42,7 @@ targets:
     platform: macOS
     sources:
       - path: LLMBudgetTrackerTests
+      - path: LLMBudgetTracker/Models/ConnectionSettings.swift
       - path: LLMBudgetTracker/Services/EndpointSecurity.swift
       - path: LLMBudgetTracker/Services/APIService.swift
       - path: LLMBudgetTracker/Services/ResponseSanitizer.swift
