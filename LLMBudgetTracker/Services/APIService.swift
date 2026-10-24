@@ -63,52 +63,122 @@ actor APIService {
         return (try decoder.decode(BudgetInfo.self, from: data), rawJSON, statusCode)
     }
 
-    /// Resolves the budget for the calling key. If the key is attached to a team,
-    /// LiteLLM tracks its budget per team-member (GET /team/{team_id}/members/me);
-    /// otherwise the user-level budget is used (GET /v2/user/info).
+    /// Resolves the effective budget for the calling key. LiteLLM can enforce limits on
+    /// several levels, so every available source is queried and the lowest limit wins
+    /// (spend, reset date and duration come from that same source):
+    /// the key itself (GET /key/info), the team-member row (GET /team/{id}/members/me),
+    /// the team (GET /team/info) and the user (GET /v2/user/info).
+    /// Sources that are unavailable or have no limit are skipped; if none has a limit,
+    /// the user-level usage is returned without a limit.
     func fetchResolvedBudgetInfo(baseURL: String, apiKey: String) async throws -> BudgetFetchResult {
         let keyInfo = try await fetchKeyInfo(baseURL: baseURL, apiKey: apiKey)
-        if let teamId = keyInfo.teamId, !teamId.isEmpty {
-            do {
-                let (info, json, status) = try await fetchTeamMemberBudget(
-                    baseURL: baseURL, apiKey: apiKey, teamId: teamId
-                )
-                return BudgetFetchResult(
-                    info: info, rawJSON: json, statusCode: status,
-                    endpoint: "/team/\(teamId)/members/me", keyInfo: keyInfo
-                )
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch is APIError {
-                // Team endpoint unavailable/forbidden on this proxy → fall through to the
-                // user-level budget rather than a misleading auth/network error. A genuine
-                // bad key re-surfaces below: /v2/user/info will also 401.
-            } catch is DecodingError {
-                // Unexpected team-member shape → fall through to user-level budget.
+        var candidates: [BudgetCandidate] = []
+
+        if let details = keyInfo.details {
+            let info = details.toBudgetInfo()
+            if info.hasBudgetLimit {
+                candidates.append(BudgetCandidate(
+                    endpoint: "/key/info", info: info, rawJSON: keyInfo.rawJSON, statusCode: keyInfo.statusCode
+                ))
             }
-            // Transport errors (offline) propagate from the do-block above — no second request.
         }
-        let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
+
+        if let teamId = keyInfo.teamId, !teamId.isEmpty {
+            // A membership without a budget can be a synthetic zero-spend row, so it only
+            // counts as a candidate when it carries a limit.
+            if let (info, json, status) = try await bestEffort({
+                try await fetchTeamMemberBudget(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
+            }), info.hasBudgetLimit {
+                candidates.append(BudgetCandidate(
+                    endpoint: "/team/\(teamId)/members/me", info: info, rawJSON: json, statusCode: status
+                ))
+            }
+            if let (info, json, status) = try await bestEffort({
+                try await fetchTeamBudget(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
+            }), info.hasBudgetLimit {
+                candidates.append(BudgetCandidate(
+                    endpoint: "/team/info", info: info, rawJSON: json, statusCode: status
+                ))
+            }
+        }
+
+        // Transport errors (offline) propagate; HTTP and decoding failures only mean that
+        // this source is unavailable.
+        let userResult: Result<BudgetCandidate, Error>
+        do {
+            let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
+            userResult = .success(
+                BudgetCandidate(endpoint: "/v2/user/info", info: info, rawJSON: json, statusCode: status)
+            )
+        } catch let error as APIError {
+            userResult = .failure(error)
+        } catch let error as DecodingError {
+            userResult = .failure(error)
+        }
+        let userCandidate = try? userResult.get()
+        if let userCandidate, userCandidate.info.hasBudgetLimit {
+            candidates.append(userCandidate)
+        }
+
+        let summary = candidates
+            .map { "\($0.endpoint): \(String(format: "$%.2f", $0.info.maxBudget ?? 0))" }
+            .joined(separator: ", ")
+
+        // min(by:) keeps the first of equal limits, so the more specific source wins ties.
+        if let chosen = candidates.min(by: { ($0.info.maxBudget ?? .infinity) < ($1.info.maxBudget ?? .infinity) }) {
+            let userId = [chosen.info.userId, userCandidate?.info.userId, keyInfo.details?.userId]
+                .compactMap { $0 }.first { !$0.isEmpty } ?? ""
+            return BudgetFetchResult(
+                info: chosen.info.withUserId(userId), rawJSON: chosen.rawJSON, statusCode: chosen.statusCode,
+                endpoint: chosen.endpoint, keyInfo: keyInfo, limitSources: summary
+            )
+        }
+        // No limit anywhere: report user-level usage, or surface its genuine failure
+        // (e.g. a bad key) instead of a misleading empty result.
+        let user = try userResult.get()
         return BudgetFetchResult(
-            info: info, rawJSON: json, statusCode: status, endpoint: "/v2/user/info", keyInfo: keyInfo
+            info: user.info, rawJSON: user.rawJSON, statusCode: user.statusCode,
+            endpoint: user.endpoint, keyInfo: keyInfo, limitSources: summary
         )
     }
 
-    /// Fetches the calling key's own info to detect team attachment, plus the raw
-    /// body + status for the request log. Team detection is best-effort: a non-2xx or
-    /// undecodable /key/info yields teamId == nil ("no team") so the caller falls through
-    /// to /v2/user/info instead of failing the whole refresh. Only transport errors
-    /// (offline) propagate.
+    /// Fetches the calling key's own info to detect team attachment and the key-level
+    /// budget, plus the raw body + status for the request log. Best-effort: a non-2xx or
+    /// undecodable /key/info yields no details ("no team, no key limit") so the caller
+    /// falls through to the other sources instead of failing the whole refresh. Only
+    /// transport errors (offline) propagate.
     func fetchKeyInfo(baseURL: String, apiKey: String) async throws -> KeyInfoFetch {
         let url = try endpoint(base: baseURL, path: "/key/info")
         let request = authenticatedRequest(url: url, apiKey: apiKey)
         let (data, response) = try await session.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode
-        let teamId: String? = {
+        let details: KeyInfoDetails? = {
             if let code = statusCode, !(200..<300).contains(code) { return nil }
-            return (try? decoder.decode(KeyInfoResponse.self, from: data))?.info?.teamId
+            return (try? decoder.decode(KeyInfoResponse.self, from: data))?.info
         }()
-        return KeyInfoFetch(teamId: teamId, rawJSON: sanitizedLogBody(from: data), statusCode: statusCode)
+        return KeyInfoFetch(details: details, rawJSON: sanitizedLogBody(from: data), statusCode: statusCode)
+    }
+
+    /// Fetches the team-level budget. Source: GET /team/info?team_id=…
+    func fetchTeamBudget(
+        baseURL: String,
+        apiKey: String,
+        teamId: String
+    // swiftlint:disable:next large_tuple
+    ) async throws -> (BudgetInfo, String, Int?) {
+        let url = try endpoint(base: baseURL, path: "/team/info")
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw APIError.invalidURL
+        }
+        components.queryItems = [URLQueryItem(name: "team_id", value: teamId)]
+        guard let requestURL = components.url else { throw APIError.invalidURL }
+        let request = authenticatedRequest(url: requestURL, apiKey: apiKey)
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode
+        try validate(response)
+        let rawJSON = sanitizedLogBody(from: data)
+        let team = try decoder.decode(TeamInfoResponse.self, from: data)
+        return (team.teamInfo.toBudgetInfo(), rawJSON, statusCode)
     }
 
     /// Fetches the caller's own per-team-member budget row (spend + max budget),
@@ -161,6 +231,18 @@ actor APIService {
 
     // MARK: - Helpers
 
+    /// Runs a budget source lookup. HTTP and decoding failures mean "source unavailable"
+    /// and yield nil; transport errors and cancellation propagate.
+    private func bestEffort<T>(_ operation: () async throws -> T) async throws -> T? {
+        do {
+            return try await operation()
+        } catch is APIError {
+            return nil
+        } catch is DecodingError {
+            return nil
+        }
+    }
+
     private func endpoint(base: String, path: String) throws -> URL {
         let baseURL = try EndpointSecurity.normalizedBaseURL(from: base)
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
@@ -201,20 +283,33 @@ actor APIService {
     }
 }
 
+/// A budget source that has a limit configured.
+private struct BudgetCandidate {
+    let endpoint: String
+    let info: BudgetInfo
+    let rawJSON: String
+    let statusCode: Int?
+}
+
 /// Resolved budget plus the endpoint it was read from (for request logging).
+/// `limitSources` lists every limit that was found, e.g. "/key/info: $25.00, /v2/user/info: $100.00".
 struct BudgetFetchResult: Sendable {
     let info: BudgetInfo
     let rawJSON: String
     let statusCode: Int?
     let endpoint: String
     let keyInfo: KeyInfoFetch
+    let limitSources: String
 }
 
-/// The /key/info exchange: detected team plus raw body + status for the request log.
+/// The /key/info exchange: key details (team attachment, key budget) plus raw body + status
+/// for the request log.
 struct KeyInfoFetch: Sendable {
-    let teamId: String?
+    let details: KeyInfoDetails?
     let rawJSON: String
     let statusCode: Int?
+
+    var teamId: String? { details?.teamId }
 }
 
 enum APIError: LocalizedError {

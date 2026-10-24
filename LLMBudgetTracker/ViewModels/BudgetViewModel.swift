@@ -95,7 +95,7 @@ final class BudgetViewModel {
         case .invalidData:
             return "Invalid response data\nCheck your LiteLLM proxy."
         case .noBudget:
-            return "No budget found\nNo budget data is available."
+            return "Used: \(menuBarText)\nNo budget limit configured."
         case .unknownError:
             return "Unknown error\nTry refreshing."
         default:
@@ -334,7 +334,10 @@ final class BudgetViewModel {
             statusCode: result.keyInfo.statusCode,
             responseBody: result.keyInfo.rawJSON,
             errorMessage: nil,
-            extractedFields: [.init(name: "team_id", value: result.keyInfo.teamId ?? "nil")]
+            extractedFields: [
+                .init(name: "team_id", value: result.keyInfo.teamId ?? "nil"),
+                .init(name: "limits_found", value: result.limitSources.isEmpty ? "none" : result.limitSources)
+            ]
         )
         logAPIRequest(
             endpoint: result.endpoint,
@@ -343,13 +346,6 @@ final class BudgetViewModel {
             errorMessage: nil,
             extractedFields: budgetInfoFields(info)
         )
-        guard info.maxBudget != nil else {
-            budgetInfo = info
-            clearDailyActivityData()
-            pacingInfo = nil
-            appState = .noBudget
-            return
-        }
         budgetInfo = info
         if dailyActivityEnabled {
             await fetchLogs(apiKey: apiKey, info: info)
@@ -358,7 +354,7 @@ final class BudgetViewModel {
         }
         computePacing(from: info)
         lastUpdated = Date()
-        appState = .loaded
+        appState = info.hasBudgetLimit ? .loaded : .noBudget
         errorMessage = nil
     }
 
@@ -551,7 +547,7 @@ final class BudgetViewModel {
     }
 
     private func fetchLogs(apiKey: String, info: BudgetInfo) async {
-        guard info.budgetResetAt != nil else {
+        guard info.canLoadDailyActivity else {
             clearDailyActivityData()
             return
         }
