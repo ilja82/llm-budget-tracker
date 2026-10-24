@@ -34,8 +34,7 @@ actor APIService {
     private let session: URLSession
     private let decoder: JSONDecoder
 
-    init() {
-        let configuration = URLSessionConfiguration.ephemeral
+    init(configuration: URLSessionConfiguration = .ephemeral) {
         configuration.timeoutIntervalForRequest = Constants.requestTimeoutSeconds
         configuration.timeoutIntervalForResource = Constants.resourceTimeoutSeconds
         configuration.httpShouldSetCookies = false
