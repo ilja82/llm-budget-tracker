@@ -60,17 +60,12 @@ struct StatsView: View {
                     title: "Invalid response data",
                     message: "LLM Budget Tracker received incomplete or malformed budget data."
                 )
-            case .noBudget:
-                errorCard(
-                    title: "No budget found",
-                    message: "Your LiteLLM account does not currently have budget data available."
-                )
             case .unknownError:
                 errorCard(
                     title: "Something went wrong",
                     message: viewModel.errorMessage ?? "An unexpected error occurred."
                 )
-            case .loaded, .refreshing:
+            case .loaded, .refreshing, .noBudget:
                 if let info = viewModel.budgetInfo {
                     BudgetCard(info: info, pacing: viewModel.pacingInfo)
                 }
@@ -163,7 +158,7 @@ struct BudgetCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Remaining")
+                        Text(info.hasBudgetLimit ? "Remaining" : "Spent")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
 
@@ -173,9 +168,10 @@ struct BudgetCard: View {
                                 .foregroundStyle(statusColor)
                                 .accessibilityLabel(heroAccessibilityLabel(remaining: remaining))
                         } else {
-                            Text("—")
+                            Text(currency(info.spend))
                                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
+                                .accessibilityLabel(String(format: "Spent so far: $%.2f", info.spend))
                         }
 
                         if let resetText {
@@ -209,6 +205,11 @@ struct BudgetCard: View {
                 ActionInsightCard(pacing: pacing, color: statusColor)
             } else if let forecastText = fallbackForecastText {
                 Text(forecastText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("No budget limit configured. Usage is available, but remaining budget and pacing are not.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -65,18 +65,29 @@ struct PopoverView: View {
                 NSApp.activate(ignoringOtherApps: true)
                 Task { @MainActor in openSettings() }
             } label: {
-                Label("Settings", systemImage: "gear")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                headerButtonLabel("Settings", systemImage: "gear")
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens the settings window")
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                headerButtonLabel("Quit App", systemImage: "power")
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Quits LLM Budget Tracker")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+    }
+
+    private func headerButtonLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }
 
     private var notConfiguredView: some View {

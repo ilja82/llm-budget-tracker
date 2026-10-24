@@ -36,3 +36,33 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker.debug
           INFOPLIST_KEY_CFBundleDisplayName: LLM Budget Tracker (Debug)
+
+  LLMBudgetTrackerTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: LLMBudgetTrackerTests
+      - path: LLMBudgetTracker/Models/ConnectionSettings.swift
+      - path: LLMBudgetTracker/Services/EndpointSecurity.swift
+      - path: LLMBudgetTracker/Services/APIService.swift
+      - path: LLMBudgetTracker/Services/ResponseSanitizer.swift
+      - path: LLMBudgetTracker/Models/BudgetInfo.swift
+      - path: LLMBudgetTracker/Models/TeamMemberInfo.swift
+      - path: LLMBudgetTracker/Models/KeyInfo.swift
+      - path: LLMBudgetTracker/Models/TeamInfo.swift
+      - path: LLMBudgetTracker/Models/SpendLog.swift
+      - path: LLMBudgetTracker/Models/ChartSelection.swift
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  LLMBudgetTracker:
+    build:
+      targets:
+        LLMBudgetTracker: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - LLMBudgetTrackerTests

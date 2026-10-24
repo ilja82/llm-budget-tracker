@@ -9,6 +9,11 @@ struct BudgetInfo: Codable {
     let budgetResetAt: Date?
     let userEmail: String?
 
+    var hasBudgetLimit: Bool { maxBudget != nil }
+
+    /// Daily activity uses a rolling date window, independent of budget/reset configuration.
+    var canLoadDailyActivity: Bool { !userId.isEmpty }
+
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case spend
@@ -32,6 +37,17 @@ struct BudgetInfo: Codable {
         self.budgetDuration = budgetDuration
         self.budgetResetAt = budgetResetAt
         self.userEmail = userEmail
+    }
+
+    func withUserId(_ userId: String) -> Self {
+        Self(
+            userId: userId,
+            spend: spend,
+            maxBudget: maxBudget,
+            budgetDuration: budgetDuration,
+            budgetResetAt: budgetResetAt,
+            userEmail: userEmail
+        )
     }
 
     init(from decoder: Decoder) throws {
