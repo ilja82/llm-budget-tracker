@@ -18,12 +18,89 @@ final class BudgetUsageTests: XCTestCase {
         XCTAssertEqual(result.info.maxBudget, 50)
     }
 
-    func testUserBudgetIsUsedWhenTeamHasNoLimit() async throws {
+    func testUserBudgetIsIgnoredForTeamKeys() async throws {
         let result = try await fetch(scenario: "user-budget")
+
+        XCTAssertEqual(result.endpoint, "/v2/user/info")
+        XCTAssertNil(result.info.maxBudget)
+        XCTAssertNil(result.info.budgetDuration)
+        XCTAssertEqual(result.info.spend, 12.5)
+        XCTAssertEqual(result.limitSources, "")
+    }
+
+    func testUserBudgetIsUsedForPersonalKeys() async throws {
+        let result = try await fetch(scenario: "personal-user-budget")
 
         XCTAssertEqual(result.endpoint, "/v2/user/info")
         XCTAssertEqual(result.info.maxBudget, 100)
         XCTAssertEqual(result.info.spend, 12.5)
+    }
+
+    func testLeastRemainingBudgetWinsOverLowestLimit() async throws {
+        let result = try await fetch(scenario: "remaining")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertEqual(result.info.spend, 99)
+        XCTAssertEqual(result.info.remainingBudget, 1)
+    }
+
+    func testTeamDefaultMemberBudgetAppliesWithoutOwnMemberLimit() async throws {
+        let result = try await fetch(scenario: "member-default")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 30)
+        XCTAssertEqual(result.info.spend, 6)
+        XCTAssertEqual(result.info.budgetDuration, "1mo")
+    }
+
+    func testZeroTeamDefaultMemberBudgetIsIgnored() async throws {
+        let result = try await fetch(scenario: "member-default-zero")
+
+        XCTAssertEqual(result.endpoint, "/v2/user/info")
+        XCTAssertNil(result.info.maxBudget)
+    }
+
+    func testKeyBudgetWindowWithLeastRemainingWins() async throws {
+        let result = try await fetch(scenario: "key-window")
+
+        XCTAssertEqual(result.endpoint, "/key/info budget_limits[1d]")
+        XCTAssertEqual(result.info.maxBudget, 5)
+        XCTAssertEqual(result.info.spend, 4)
+        XCTAssertEqual(result.info.budgetDuration, "1d")
+        XCTAssertNotNil(result.info.budgetResetAt)
+        XCTAssertTrue(result.limitSources.contains("/key/info: $10.00 of $100.00"))
+    }
+
+    func testKeyBudgetWindowsStoredAsJSONStringAreDecoded() async throws {
+        let result = try await fetch(scenario: "key-window-string")
+
+        XCTAssertEqual(result.endpoint, "/key/info budget_limits[1d]")
+        XCTAssertEqual(result.info.maxBudget, 5)
+    }
+
+    func testKeyBudgetWindowWithoutUsageIsSkipped() async throws {
+        let result = try await fetch(scenario: "key-window-no-usage")
+
+        XCTAssertEqual(result.endpoint, "/key/info")
+        XCTAssertEqual(result.info.maxBudget, 100)
+    }
+
+    func testPercentageModeWithoutLimitShowsSpend() {
+        let info = BudgetInfo(
+            userId: "fixture-user", spend: 12.5, maxBudget: nil, budgetDuration: nil, budgetResetAt: nil, userEmail: nil
+        )
+
+        XCTAssertEqual(info.usageText(.percentage), "$12.50")
+        XCTAssertEqual(info.usageText(.dollar), "$12.50")
+    }
+
+    func testPercentageModeWithLimitShowsPercentage() {
+        let info = BudgetInfo(
+            userId: "fixture-user", spend: 12.5, maxBudget: 50, budgetDuration: nil, budgetResetAt: nil, userEmail: nil
+        )
+
+        XCTAssertEqual(info.usageText(.percentage), "25%")
     }
 
     func testUnavailableTeamEndpointFallsBackToUser() async throws {
@@ -81,8 +158,8 @@ final class BudgetUsageTests: XCTestCase {
         XCTAssertEqual(result.info.maxBudget, 25)
         XCTAssertEqual(result.info.spend, 7)
         XCTAssertEqual(result.info.userId, "fixture-user")
-        XCTAssertTrue(result.limitSources.contains("/key/info: $25.00"))
-        XCTAssertTrue(result.limitSources.contains("/v2/user/info: $100.00"))
+        XCTAssertTrue(result.limitSources.contains("/key/info: $7.00 of $25.00"))
+        XCTAssertTrue(result.limitSources.contains("/v2/user/info: $12.50 of $100.00"))
     }
 
     func testLowestLimitWinsWhenUserBudgetIsLowerThanKeyBudget() async throws {
@@ -136,14 +213,14 @@ final class BudgetUsageTests: XCTestCase {
 
         XCTAssertEqual(result.keyInfo.teamId, "team-fixture")
         XCTAssertEqual(result.endpoint, "/v2/user/info")
-        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertNil(result.info.maxBudget)
     }
 
     func testTeamInfoWithoutTeamDetailsIsSkipped() async throws {
         let result = try await fetch(scenario: "team-info-missing")
 
         XCTAssertEqual(result.endpoint, "/v2/user/info")
-        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertNil(result.info.maxBudget)
         XCTAssertFalse(result.limitSources.contains("/team/info"))
     }
 
@@ -210,14 +287,53 @@ private final class BudgetFixtureURLProtocol: URLProtocol, @unchecked Sendable {
         "user-budget.invalid": [
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":100}"#)
         ],
+        "personal-user-budget.invalid": [
+            "/key/info": (200, #"{"info":{"user_id":"fixture-user"}}"#),
+            "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":100}"#)
+        ],
+        "remaining.invalid": [
+            "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":0,"max_budget":50}}"#),
+            member: (200, #"{"user_id":"fixture-user","spend":99,"litellm_budget_table":{"max_budget":100}}"#)
+        ],
+        "member-default.invalid": [
+            member: (200, #"{"user_id":"fixture-user","spend":6,"litellm_budget_table":null}"#),
+            "/team/info": (200, #"""
+                {"team_id":"team-fixture","team_info":{"spend":9,"max_budget":null,
+                "team_member_budget_table":{"max_budget":30,"budget_duration":"1mo"}}}
+                """#)
+        ],
+        "member-default-zero.invalid": [
+            member: (200, #"{"user_id":"fixture-user","spend":6,"litellm_budget_table":null}"#),
+            "/team/info": (200, #"""
+                {"team_id":"team-fixture","team_info":{"spend":9,"team_member_budget_table":{"max_budget":0}}}
+                """#)
+        ],
+        "key-window.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"user_id":"fixture-user","spend":10,"max_budget":100,
+                "budget_limits":[{"budget_duration":"1d","max_budget":5,"reset_at":"2026-11-19T00:00:00Z"}],
+                "budget_limits_usage":{"1d":{"current_spend":4}}}}
+                """#)
+        ],
+        "key-window-string.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"user_id":"fixture-user","spend":10,"max_budget":100,
+                "budget_limits":"[{\"budget_duration\":\"1d\",\"max_budget\":5}]",
+                "budget_limits_usage":{"1d":{"current_spend":4}}}}
+                """#)
+        ],
+        "key-window-no-usage.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"user_id":"fixture-user","spend":10,"max_budget":100,
+                "budget_limits":[{"budget_duration":"1d","max_budget":5}]}}
+                """#)
+        ],
         "key-lowest.invalid": [
-            "/key/info": (
-                200, #"{"info":{"team_id":"team-fixture","user_id":"fixture-user","spend":7,"max_budget":25}}"#
-            ),
+            "/key/info": (200, #"{"info":{"user_id":"fixture-user","spend":7,"max_budget":25}}"#),
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":100}"#)
         ],
         "user-lowest.invalid": [
-            "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":3,"max_budget":100}}"#),
+            "/key/info": (200, #"{"info":{"spend":3,"max_budget":100}}"#),
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":25}"#)
         ],
         "team-lowest.invalid": [
@@ -230,7 +346,7 @@ private final class BudgetFixtureURLProtocol: URLProtocol, @unchecked Sendable {
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":60}"#)
         ],
         "tie.invalid": [
-            "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":3,"max_budget":25}}"#),
+            "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":9,"max_budget":25}}"#),
             "/team/info": (200, #"{"team_id":"team-fixture","team_info":{"spend":9,"max_budget":25}}"#),
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":25}"#)
         ],

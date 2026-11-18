@@ -25,8 +25,7 @@ struct TeamMemberInfoResponse: Codable {
     }
 
     /// Map the team-member row onto BudgetInfo so pacing/UI consume it unchanged.
-    /// A missing budget table (or max_budget) yields maxBudget == nil, so the API
-    /// service falls back to user-level usage instead of accepting a default zero row.
+    /// A missing budget table (or max_budget) yields maxBudget == nil.
     func toBudgetInfo() -> BudgetInfo {
         BudgetInfo(
             userId: userId,

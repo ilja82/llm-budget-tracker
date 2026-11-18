@@ -71,13 +71,7 @@ final class BudgetViewModel {
     var menuBarText: String {
         if appState == .offline, budgetInfo == nil { return "⏳" }
         guard let info = budgetInfo else { return "$--" }
-        switch displayMode {
-        case .dollar:
-            return String(format: "$%.2f", info.spend)
-        case .percentage:
-            guard let max = info.maxBudget, max > 0 else { return "N/A" }
-            return String(format: "%.0f%%", (info.spend / max) * 100)
-        }
+        return info.usageText(displayMode)
     }
 
     var menuBarTooltip: String {

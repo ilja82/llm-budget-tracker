@@ -39,6 +39,19 @@ struct BudgetInfo: Codable {
         self.userEmail = userEmail
     }
 
+    /// Budget left before LiteLLM rejects requests; infinite without a limit.
+    var remainingBudget: Double {
+        guard let maxBudget else { return .infinity }
+        return max(maxBudget - spend, 0)
+    }
+
+    func usageText(_ mode: MenuBarDisplayMode) -> String {
+        if mode == .percentage, let maxBudget, maxBudget > 0 {
+            return String(format: "%.0f%%", (spend / maxBudget) * 100)
+        }
+        return String(format: "$%.2f", spend)
+    }
+
     func withUserId(_ userId: String) -> Self {
         Self(
             userId: userId,
@@ -46,6 +59,17 @@ struct BudgetInfo: Codable {
             maxBudget: maxBudget,
             budgetDuration: budgetDuration,
             budgetResetAt: budgetResetAt,
+            userEmail: userEmail
+        )
+    }
+
+    func withoutBudgetLimit() -> Self {
+        Self(
+            userId: userId,
+            spend: spend,
+            maxBudget: nil,
+            budgetDuration: nil,
+            budgetResetAt: nil,
             userEmail: userEmail
         )
     }
