@@ -108,6 +108,30 @@ final class BudgetUsageTests: XCTestCase {
 
         XCTAssertEqual(result.endpoint, "/v2/user/info")
         XCTAssertEqual(result.info.spend, 12.5)
+        XCTAssertEqual(result.limitSources, "/team/team-fixture/members/me: unavailable (Server returned HTTP 404)")
+    }
+
+    func testMemberBudgetResetDateWithoutTimeZoneIsReadAsUTC() async throws {
+        let result = try await fetch(scenario: "member-naive-date")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 99)
+        XCTAssertEqual(result.info.budgetResetAt, Date(timeIntervalSince1970: 1_796_083_200))
+        XCTAssertNil(result.teamBudget)
+    }
+
+    func testUnreadableMemberResetDateKeepsTheMemberBudget() async throws {
+        let result = try await fetch(scenario: "member-bad-date")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 99)
+        XCTAssertNil(result.info.budgetResetAt)
+    }
+
+    func testUndecodableMemberResponseIsLoggedAsUnavailable() async throws {
+        let result = try await fetch(scenario: "member-invalid")
+
+        XCTAssertTrue(result.limitSources.contains("/team/team-fixture/members/me: unavailable (invalid response)"))
     }
 
     func testFallbackAuthenticationFailureIsNotReportedAsZeroUsage() async {
@@ -184,6 +208,34 @@ final class BudgetUsageTests: XCTestCase {
 
         XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
         XCTAssertEqual(result.info.maxBudget, 25)
+        XCTAssertNil(result.teamBudget)
+    }
+
+    func testMemberBudgetIsShownWhenTheTeamHasLessRemaining() async throws {
+        let result = try await fetch(scenario: "team-shared")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.spend, 20)
+        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertEqual(result.teamBudget?.spend, 950)
+        XCTAssertEqual(result.teamBudget?.maxBudget, 1000)
+        XCTAssertEqual(result.teamBudget?.remainingBudget, 50)
+        XCTAssertTrue(result.limitSources.contains("/team/info: $950.00 of $1000.00"))
+    }
+
+    func testKeyBudgetIsShownWhenTheTeamHasLessRemaining() async throws {
+        let result = try await fetch(scenario: "team-shared-key")
+
+        XCTAssertEqual(result.endpoint, "/key/info")
+        XCTAssertEqual(result.info.maxBudget, 50)
+        XCTAssertEqual(result.teamBudget?.remainingBudget, 16)
+    }
+
+    func testTeamBudgetWithoutPersonalLimitHasNoTeamWarning() async throws {
+        let result = try await fetch(scenario: "team-lowest")
+
+        XCTAssertEqual(result.endpoint, "/team/info")
+        XCTAssertNil(result.teamBudget)
     }
 
     func testEqualLimitsPreferTheMoreSpecificSource() async throws {
@@ -221,7 +273,7 @@ final class BudgetUsageTests: XCTestCase {
 
         XCTAssertEqual(result.endpoint, "/v2/user/info")
         XCTAssertNil(result.info.maxBudget)
-        XCTAssertFalse(result.limitSources.contains("/team/info"))
+        XCTAssertEqual(result.limitSources, "/team/info: unavailable (invalid response)")
     }
 
     func testNoLimitAnywhereReportsLimitSourcesAsEmpty() async throws {
@@ -344,6 +396,29 @@ private final class BudgetFixtureURLProtocol: URLProtocol, @unchecked Sendable {
             member: (200, #"{"user_id":"fixture-user","spend":1,"litellm_budget_table":{"max_budget":25}}"#),
             "/team/info": (200, #"{"team_id":"team-fixture","team_info":{"spend":9,"max_budget":80}}"#),
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":60}"#)
+        ],
+        "member-naive-date.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":0.58,"litellm_budget_table":
+                {"max_budget":99,"budget_duration":"30d","budget_reset_at":"2026-12-01T00:00:00"}}
+                """#),
+            "/team/info": (200, #"{"team_id":"team-fixture","team_info":{"spend":1281.6,"max_budget":10000}}"#)
+        ],
+        "member-bad-date.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":1,"litellm_budget_table":{"max_budget":99,"budget_reset_at":"soon"}}
+                """#)
+        ],
+        "member-invalid.invalid": [
+            member: (200, #"{"user_id":"fixture-user","spend":1,"litellm_budget_table":"broken"}"#)
+        ],
+        "team-shared.invalid": [
+            member: (200, #"{"user_id":"fixture-user","spend":20,"litellm_budget_table":{"max_budget":100}}"#),
+            "/team/info": (200, #"{"team_id":"team-fixture","team_info":{"spend":950,"max_budget":1000}}"#)
+        ],
+        "team-shared-key.invalid": [
+            "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":0,"max_budget":50}}"#),
+            "/team/info": (200, #"{"team_id":"team-fixture","team_info":{"spend":9,"max_budget":25}}"#)
         ],
         "tie.invalid": [
             "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":9,"max_budget":25}}"#),
