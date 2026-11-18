@@ -2,15 +2,15 @@ name: LLMBudgetTracker
 options:
   bundleIdPrefix: com.ilja82
   deploymentTarget:
-    macOS: "26.0"
-  xcodeVersion: "26.5"
+    macOS: "27.0"
+  xcodeVersion: "27.0"
   createIntermediateGroups: true
 
 targets:
   LLMBudgetTracker:
     type: application
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "27.0"
     sources:
       - path: LLMBudgetTracker
         excludes:
@@ -22,7 +22,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker
         SWIFT_VERSION: "6.0"
-        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        MACOSX_DEPLOYMENT_TARGET: "27.0"
         CODE_SIGN_ENTITLEMENTS: LLMBudgetTracker/LLMBudgetTracker.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES

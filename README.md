@@ -3,7 +3,7 @@
 The LLM Budget Tracker is a macOS application that sits in your status bar and monitors your LiteLLM budget usage. It retrieves your budget from your
 LiteLLM proxy and displays daily activity charts.
 
-![macOS 26+](https://img.shields.io/badge/macOS-26%2B-blue)
+![macOS 27+](https://img.shields.io/badge/macOS-27%2B-blue)
 ![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)
 
 ## What it does
