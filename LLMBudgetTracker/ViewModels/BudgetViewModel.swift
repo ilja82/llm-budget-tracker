@@ -41,6 +41,8 @@ final class BudgetViewModel {
     private(set) var budgetInfo: BudgetInfo? {
         didSet { _safeSpendLine = nil }
     }
+    /// The shared team budget when it has less remaining than `budgetInfo`.
+    private(set) var teamBudget: BudgetInfo?
     private(set) var spendLogs: [SpendLog] = [] {
         didSet { _dailySpend = nil; _safeSpendLine = nil }
     }
@@ -270,6 +272,7 @@ final class BudgetViewModel {
         }
         guard !endpointURL.isEmpty else {
             budgetInfo = nil
+            teamBudget = nil
             spendLogs = []
             dailyActivity = []
             pacingInfo = nil
@@ -279,6 +282,7 @@ final class BudgetViewModel {
         }
         guard let apiKey = try? KeychainService.load(), !apiKey.isEmpty else {
             budgetInfo = nil
+            teamBudget = nil
             spendLogs = []
             dailyActivity = []
             pacingInfo = nil
@@ -341,6 +345,7 @@ final class BudgetViewModel {
             extractedFields: budgetInfoFields(info)
         )
         budgetInfo = info
+        teamBudget = result.teamBudget
         if dailyActivityEnabled {
             await fetchLogs(apiKey: apiKey, info: info)
         } else {
@@ -458,6 +463,7 @@ final class BudgetViewModel {
             userEmail: "dev@test.local"
         )
         budgetInfo = fakeBudgetInfo
+        teamBudget = nil
         if dailyActivityEnabled {
             let billingStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
             let actualDaysPassed = max(1, (calendar.dateComponents([.day], from: billingStart, to: now).day ?? 0) + 1)

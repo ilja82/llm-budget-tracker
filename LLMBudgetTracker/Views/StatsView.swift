@@ -26,7 +26,7 @@ struct StatsView: View {
             case .rateLimited:
                 if let info = viewModel.budgetInfo {
                     VStack(alignment: .leading, spacing: 10) {
-                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
                         errorCard(
                             title: "Requests paused",
                             message: viewModel.errorMessage ??
@@ -49,7 +49,7 @@ struct StatsView: View {
             case .offline:
                 if let info = viewModel.budgetInfo {
                     VStack(alignment: .leading, spacing: 10) {
-                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
                         offlineCard
                     }
                 } else {
@@ -67,7 +67,7 @@ struct StatsView: View {
                 )
             case .loaded, .refreshing, .noBudget:
                 if let info = viewModel.budgetInfo {
-                    BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                    BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
                 }
             }
         }
@@ -118,6 +118,7 @@ struct StatsView: View {
 struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
+    var teamBudget: BudgetInfo?
 
     private var statusColor: Color {
         pacing?.status.color ?? fallbackStatusColor
@@ -142,6 +143,15 @@ struct BudgetCard: View {
         guard let resetAt = info.budgetResetAt else { return nil }
         let days = Calendar.current.dateComponents([.day], from: Date(), to: resetAt).day ?? 0
         return "Resets in \(Swift.max(0, days))d"
+    }
+
+    private var teamWarningText: String? {
+        guard let teamBudget, let maxBudget = teamBudget.maxBudget else { return nil }
+        return String(
+            format: "Team budget: $%.2f of $%.2f left. Requests stop when the team budget runs out.",
+            teamBudget.remainingBudget,
+            maxBudget
+        )
     }
 
     private var fallbackForecastText: String? {
@@ -212,6 +222,13 @@ struct BudgetCard: View {
                 Text("No budget limit configured. Usage is available, but remaining budget and pacing are not.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let teamWarningText {
+                Label(teamWarningText, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -55,6 +55,6 @@ struct LiteLLMBudgetTable: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         maxBudget = try container.decodeIfPresent(Double.self, forKey: .maxBudget)
         budgetDuration = try container.decodeIfPresent(String.self, forKey: .budgetDuration)
-        budgetResetAt = try container.decodeIfPresent(Date.self, forKey: .budgetResetAt)
+        budgetResetAt = try? container.decodeIfPresent(Date.self, forKey: .budgetResetAt)
     }
 }
