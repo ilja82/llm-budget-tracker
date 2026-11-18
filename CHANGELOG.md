@@ -7,7 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Highlights
 
-- The effective budget limit is now resolved across key, team member, team and user levels; the lowest limit wins.
+- The effective budget limit is now resolved across key, team member, team and user levels; the level with the least
+  remaining budget wins.
 - Usage is shown even when no budget limit is configured.
 - New "This week" and "Last week" ranges in the per-model spend breakdown.
 - New "Quit App" button in the popover.
@@ -21,8 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   independent of your locale; "Last week" is the previous calendar week. All ranges are based on UTC, like the
   daily API data.
 - **Budget limits from all levels:** besides the user (`/v2/user/info`) and team-member (`/team/{id}/members/me`)
-  budgets, the app now also considers the key's own budget (`/key/info`) and the team budget (`/team/info`).
-  If several limits are set, the lowest one is used, together with the spend, reset time and duration of that level.
+  budgets, the app now also considers the key's own budget and its `budget_limits` windows (`/key/info`), the team
+  budget and the team's default member budget (`/team/info`). If several limits are set, the one with the least
+  remaining budget is used, together with the spend, reset time and duration of that level. For keys that belong to a
+  team, the user limit is skipped, like LiteLLM does by default.
 - **Keep the saved API key:** if an API key is already stored, you can change only the proxy URL and leave the API key
   field empty. "Test Connection" then uses the saved key, and "Save" keeps it unchanged. A hint below the field
   explains this.
@@ -32,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **No budget limit is no longer an error.** Instead of "No budget found", the popover shows your spend so far and
   explains that remaining budget and pacing require a limit. The menu bar tooltip reads "Used: … / No budget limit
   configured."
+- **Percent display without a limit:** the menu bar shows the spend in dollars instead of "N/A".
 - **Daily activity charts no longer require a budget reset date** and are also available without a budget limit.
 - **"All Models" filter:** the model menu above the daily activity chart now uses the same bordered style as the
   "Spend / Tokens / Requests" control and shows a single chevron instead of two.
@@ -56,15 +60,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`ConnectionSettings.swift`:** testable form logic for the connection settings (form validation, which API key is
   used for testing, whether a key is saved).
 - **`limits_found`** field in the Developer Mode request log, listing every limit that was found,
-  e.g. `/key/info: $25.00, /v2/user/info: $100.00`.
+  e.g. `/key/info: $7.00 of $25.00, /v2/user/info: $12.50 of $100.00`.
 
 #### Changed
 
-- **`APIService.fetchResolvedBudgetInfo`** collects all sources with a limit as candidates and picks the lowest
-  (`min(by:)` keeps the first of equal limits, so the more specific source wins ties). HTTP and decoding failures mark a
-  source as unavailable via the new `bestEffort` helper; transport errors and cancellation still propagate. If no
-  source has a limit, user-level usage is returned; if that also fails, its error is surfaced. A `/team/info` response
-  without `team_info` fails decoding and is skipped.
+- **`APIService.fetchResolvedBudgetInfo`** collects all sources with a limit as candidates and picks the one with
+  the least remaining budget (`min(by:)` keeps the first of equal values, so the more specific source wins ties).
+  HTTP and decoding failures mark a source as unavailable via the new `bestEffort` helper; transport errors and
+  cancellation still propagate. If no source has a limit, user-level usage is returned without a limit; if that also
+  fails, its error is surfaced. A `/team/info` response without `team_info` fails decoding and is skipped.
 - **`APIService.init`** accepts a `URLSessionConfiguration` (default `.ephemeral`) so tests can inject a mock protocol.
 - **`KeyInfoDetails`** now also decodes `user_id`, `spend`, `max_budget`, `budget_duration` and `budget_reset_at`
   (leniently, so an unexpected shape never hides the team attachment). `KeyInfoFetch` exposes `details` instead of

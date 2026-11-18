@@ -1,6 +1,6 @@
 import Foundation
 
-/// Response from GET /team/info. Only the team-level budget is consumed.
+/// Response from GET /team/info. Only the team budget and the default team-member budget are consumed.
 /// A missing `team_info` fails decoding, which the API service treats as "source unavailable".
 struct TeamInfoResponse: Codable {
     let teamInfo: TeamInfoDetails
@@ -13,12 +13,14 @@ struct TeamInfoDetails: Codable {
     let maxBudget: Double?
     let budgetDuration: String?
     let budgetResetAt: Date?
+    let teamMemberBudgetTable: LiteLLMBudgetTable?
 
     enum CodingKeys: String, CodingKey {
         case spend
         case maxBudget = "max_budget"
         case budgetDuration = "budget_duration"
         case budgetResetAt = "budget_reset_at"
+        case teamMemberBudgetTable = "team_member_budget_table"
     }
 
     init(from decoder: Decoder) throws {
@@ -27,6 +29,9 @@ struct TeamInfoDetails: Codable {
         maxBudget = try? container.decodeIfPresent(Double.self, forKey: .maxBudget)
         budgetDuration = try? container.decodeIfPresent(String.self, forKey: .budgetDuration)
         budgetResetAt = try? container.decodeIfPresent(Date.self, forKey: .budgetResetAt)
+        teamMemberBudgetTable = try? container.decodeIfPresent(
+            LiteLLMBudgetTable.self, forKey: .teamMemberBudgetTable
+        )
     }
 
     func toBudgetInfo() -> BudgetInfo {

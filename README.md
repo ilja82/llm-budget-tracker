@@ -16,10 +16,12 @@ LiteLLM proxy and displays daily activity charts.
   Like the daily API data, these ranges are based on UTC.
 - Shows spend even without a configured budget limit. Remaining budget and projections require a limit;
   daily charts require neither a limit nor a budget reset time.
-- Resolves the budget limit across all available levels: key (`/key/info`), team member (`/team/{id}/members/me`),
-  team (`/team/info`), and user (`/v2/user/info`). If several limits are set, the lowest one applies; spend, reset time,
-  and duration come from the same level. On equal limits, the level listed first wins. Levels without a limit or without
-  access are skipped. In the Developer Mode request log, `limits_found` shows which limits were found.
+- Resolves the budget limit across all available levels: key (`/key/info`, including its `budget_limits` windows),
+  team member (`/team/{id}/members/me`, or the team's default member budget), team (`/team/info`), and user
+  (`/v2/user/info`). LiteLLM rejects a request when any level is exhausted, so the level with the least remaining budget
+  applies; spend, reset time, and duration come from the same level. On equal remaining budgets, the level listed first
+  wins. For keys that belong to a team, the user limit is skipped, because LiteLLM ignores it by default. Levels without
+  a limit or without access are skipped. In the Developer Mode request log, `limits_found` shows which limits were found.
 - If no limit is found, the user data (spend) is shown.
 
 ## Install the app

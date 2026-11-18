@@ -63,69 +63,28 @@ actor APIService {
         return (try decoder.decode(BudgetInfo.self, from: data), rawJSON, statusCode)
     }
 
-    /// Resolves the effective budget for the calling key. LiteLLM can enforce limits on
-    /// several levels, so every available source is queried and the lowest limit wins
-    /// (spend, reset date and duration come from that same source):
-    /// the key itself (GET /key/info), the team-member row (GET /team/{id}/members/me),
-    /// the team (GET /team/info) and the user (GET /v2/user/info).
-    /// Sources that are unavailable or have no limit are skipped; if none has a limit,
-    /// the user-level usage is returned without a limit.
+    /// Resolves the effective budget for the calling key. LiteLLM rejects a request when any
+    /// level is exhausted, so the level with the least remaining budget wins; its spend,
+    /// reset date and duration are reported. Levels: the key (GET /key/info, including its
+    /// `budget_limits` windows), the team member (GET /team/{id}/members/me, or the team's
+    /// default member budget), the team (GET /team/info) and, for keys without a team, the
+    /// user (GET /v2/user/info). Without any limit, the user-level spend is reported.
     func fetchResolvedBudgetInfo(baseURL: String, apiKey: String) async throws -> BudgetFetchResult {
         let keyInfo = try await fetchKeyInfo(baseURL: baseURL, apiKey: apiKey)
-        var candidates: [BudgetCandidate] = []
-
-        if let details = keyInfo.details {
-            let info = details.toBudgetInfo()
-            if info.hasBudgetLimit {
-                candidates.append(BudgetCandidate(
-                    endpoint: "/key/info", info: info, rawJSON: keyInfo.rawJSON, statusCode: keyInfo.statusCode
-                ))
-            }
+        let teamId = keyInfo.teamId.flatMap { $0.isEmpty ? nil : $0 }
+        var candidates = keyCandidates(keyInfo)
+        if let teamId {
+            candidates += try await teamCandidates(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
         }
 
-        if let teamId = keyInfo.teamId, !teamId.isEmpty {
-            // A membership without a budget can be a synthetic zero-spend row, so it only
-            // counts as a candidate when it carries a limit.
-            if let (info, json, status) = try await bestEffort({
-                try await fetchTeamMemberBudget(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
-            }), info.hasBudgetLimit {
-                candidates.append(BudgetCandidate(
-                    endpoint: "/team/\(teamId)/members/me", info: info, rawJSON: json, statusCode: status
-                ))
-            }
-            if let (info, json, status) = try await bestEffort({
-                try await fetchTeamBudget(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
-            }), info.hasBudgetLimit {
-                candidates.append(BudgetCandidate(
-                    endpoint: "/team/info", info: info, rawJSON: json, statusCode: status
-                ))
-            }
-        }
-
-        // Transport errors (offline) propagate; HTTP and decoding failures only mean that
-        // this source is unavailable.
-        let userResult: Result<BudgetCandidate, Error>
-        do {
-            let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
-            userResult = .success(
-                BudgetCandidate(endpoint: "/v2/user/info", info: info, rawJSON: json, statusCode: status)
-            )
-        } catch let error as APIError {
-            userResult = .failure(error)
-        } catch let error as DecodingError {
-            userResult = .failure(error)
-        }
+        let userResult = try await userBudgetResult(baseURL: baseURL, apiKey: apiKey)
         let userCandidate = try? userResult.get()
-        if let userCandidate, userCandidate.info.hasBudgetLimit {
+        if teamId == nil, let userCandidate, userCandidate.info.hasBudgetLimit {
             candidates.append(userCandidate)
         }
 
-        let summary = candidates
-            .map { "\($0.endpoint): \(String(format: "$%.2f", $0.info.maxBudget ?? 0))" }
-            .joined(separator: ", ")
-
-        // min(by:) keeps the first of equal limits, so the more specific source wins ties.
-        if let chosen = candidates.min(by: { ($0.info.maxBudget ?? .infinity) < ($1.info.maxBudget ?? .infinity) }) {
+        let summary = candidates.map(\.summary).joined(separator: ", ")
+        if let chosen = candidates.min(by: { $0.info.remainingBudget < $1.info.remainingBudget }) {
             let userId = [chosen.info.userId, userCandidate?.info.userId, keyInfo.details?.userId]
                 .compactMap { $0 }.first { !$0.isEmpty } ?? ""
             return BudgetFetchResult(
@@ -133,11 +92,10 @@ actor APIService {
                 endpoint: chosen.endpoint, keyInfo: keyInfo, limitSources: summary
             )
         }
-        // No limit anywhere: report user-level usage, or surface its genuine failure
-        // (e.g. a bad key) instead of a misleading empty result.
         let user = try userResult.get()
         return BudgetFetchResult(
-            info: user.info, rawJSON: user.rawJSON, statusCode: user.statusCode,
+            info: teamId == nil ? user.info : user.info.withoutBudgetLimit(),
+            rawJSON: user.rawJSON, statusCode: user.statusCode,
             endpoint: user.endpoint, keyInfo: keyInfo, limitSources: summary
         )
     }
@@ -159,13 +117,14 @@ actor APIService {
         return KeyInfoFetch(details: details, rawJSON: sanitizedLogBody(from: data), statusCode: statusCode)
     }
 
-    /// Fetches the team-level budget. Source: GET /team/info?team_id=…
-    func fetchTeamBudget(
+    /// Fetches the team details with the team budget and the default team-member budget.
+    /// Source: GET /team/info?team_id=…
+    func fetchTeamInfo(
         baseURL: String,
         apiKey: String,
         teamId: String
     // swiftlint:disable:next large_tuple
-    ) async throws -> (BudgetInfo, String, Int?) {
+    ) async throws -> (TeamInfoDetails, String, Int?) {
         let url = try endpoint(base: baseURL, path: "/team/info")
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
@@ -178,7 +137,7 @@ actor APIService {
         try validate(response)
         let rawJSON = sanitizedLogBody(from: data)
         let team = try decoder.decode(TeamInfoResponse.self, from: data)
-        return (team.teamInfo.toBudgetInfo(), rawJSON, statusCode)
+        return (team.teamInfo, rawJSON, statusCode)
     }
 
     /// Fetches the caller's own per-team-member budget row (spend + max budget),
@@ -230,6 +189,64 @@ actor APIService {
     }
 
     // MARK: - Helpers
+
+    private func keyCandidates(_ keyInfo: KeyInfoFetch) -> [BudgetCandidate] {
+        guard let details = keyInfo.details else { return [] }
+        let info = details.toBudgetInfo()
+        let limits = (info.hasBudgetLimit ? [("/key/info", info)] : [])
+            + details.windowBudgets().map { ("/key/info budget_limits[\($0.budgetDuration ?? "")]", $0) }
+        return limits.map { endpoint, info in
+            BudgetCandidate(endpoint: endpoint, info: info, rawJSON: keyInfo.rawJSON, statusCode: keyInfo.statusCode)
+        }
+    }
+
+    private func teamCandidates(baseURL: String, apiKey: String, teamId: String) async throws -> [BudgetCandidate] {
+        let member = try await bestEffort {
+            try await fetchTeamMemberBudget(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
+        }
+        let team = try await bestEffort {
+            try await fetchTeamInfo(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
+        }
+        var candidates: [BudgetCandidate] = []
+        if let (info, json, status) = member,
+           let memberInfo = Self.effectiveMemberBudget(member: info, team: team?.0) {
+            candidates.append(BudgetCandidate(
+                endpoint: "/team/\(teamId)/members/me", info: memberInfo, rawJSON: json, statusCode: status
+            ))
+        }
+        if let (details, json, status) = team, details.toBudgetInfo().hasBudgetLimit {
+            candidates.append(BudgetCandidate(
+                endpoint: "/team/info", info: details.toBudgetInfo(), rawJSON: json, statusCode: status
+            ))
+        }
+        return candidates
+    }
+
+    /// The member's own limit, else the team's default member budget; nil without either.
+    private static func effectiveMemberBudget(member: BudgetInfo, team: TeamInfoDetails?) -> BudgetInfo? {
+        if member.hasBudgetLimit { return member }
+        guard let defaultBudget = team?.teamMemberBudgetTable,
+              let maxBudget = defaultBudget.maxBudget, maxBudget > 0 else { return nil }
+        return BudgetInfo(
+            userId: member.userId,
+            spend: member.spend,
+            maxBudget: maxBudget,
+            budgetDuration: defaultBudget.budgetDuration,
+            budgetResetAt: defaultBudget.budgetResetAt,
+            userEmail: member.userEmail
+        )
+    }
+
+    private func userBudgetResult(baseURL: String, apiKey: String) async throws -> Result<BudgetCandidate, Error> {
+        do {
+            let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
+            return .success(BudgetCandidate(endpoint: "/v2/user/info", info: info, rawJSON: json, statusCode: status))
+        } catch let error as APIError {
+            return .failure(error)
+        } catch let error as DecodingError {
+            return .failure(error)
+        }
+    }
 
     /// Runs a budget source lookup. HTTP and decoding failures mean "source unavailable"
     /// and yield nil; transport errors and cancellation propagate.
@@ -289,10 +306,14 @@ private struct BudgetCandidate {
     let info: BudgetInfo
     let rawJSON: String
     let statusCode: Int?
+
+    var summary: String {
+        "\(endpoint): " + String(format: "$%.2f of $%.2f", info.spend, info.maxBudget ?? 0)
+    }
 }
 
 /// Resolved budget plus the endpoint it was read from (for request logging).
-/// `limitSources` lists every limit that was found, e.g. "/key/info: $25.00, /v2/user/info: $100.00".
+/// `limitSources` lists every limit that was found, e.g. "/key/info: $7.00 of $25.00, /team/info: $9.00 of $80.00".
 struct BudgetFetchResult: Sendable {
     let info: BudgetInfo
     let rawJSON: String
