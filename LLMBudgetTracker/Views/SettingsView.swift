@@ -150,18 +150,15 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-<<<<<<< 9764b8266f5678d2968b02f1209979f16df44a34
-            Toggle("Show remaining instead of used", isOn: vm.showRemaining)
-            Text("Counts percentages and the menu bar fill down from 100%.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-=======
             Picker("Menu Bar Icon", selection: vm.iconStyle) {
                 ForEach(MenuBarIconStyle.allCases) { style in
                     Text(style.label).tag(style)
                 }
             }
->>>>>>> c6d744a184bade792f5dd8203ff7584ffdad2aee
+            Toggle("Show remaining instead of used", isOn: vm.showRemaining)
+            Text("Counts percentages and the menu bar fill down from 100%.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         } header: {
             Text("Display")
         }
