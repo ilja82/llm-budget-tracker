@@ -22,7 +22,7 @@ struct UpdateChecker: UpdateChecking {
     private let session: URLSession
     private let userAgent: String
 
-    init(version: String = UpdateChecker.appVersion, configuration: URLSessionConfiguration = .ephemeral) {
+    init(version: String = Self.appVersion, configuration: URLSessionConfiguration = .ephemeral) {
         configuration.timeoutIntervalForRequest = Self.requestTimeout
         configuration.timeoutIntervalForResource = Self.requestTimeout
         configuration.waitsForConnectivity = false
