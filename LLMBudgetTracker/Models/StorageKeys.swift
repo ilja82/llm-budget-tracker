@@ -7,6 +7,7 @@ enum StorageKeys {
         static let displayMode           = "displayMode"
         static let dailyActivityEnabled  = "dailyActivityEnabled"
         static let dailyActivityCache    = "dailyActivity.cache"
+        static let showRemaining         = "showRemaining"
     }
 
     enum DevMode {
@@ -30,13 +31,31 @@ enum StorageKeys {
         static let modelSpendRange    = "ui.modelSpend.range"
     }
 
+    enum Update {
+        static let lastCheck         = "update.lastCheck"
+        static let latestVersion     = "update.latestVersion"
+        static let latestPublishedAt = "update.latestPublishedAt"
+        static let dismissedVersion  = "update.dismissedVersion"
+        static let checkEnabled      = "update.checkEnabled"
+    }
+
     /// All keys that resetToInitialState() must wipe. Add new keys here alongside their definition.
     static let allKeys: [String] = [
         App.endpointURL, App.updateIntervalMinutes, App.displayMode,
-        App.dailyActivityEnabled, App.dailyActivityCache,
+        App.dailyActivityEnabled, App.dailyActivityCache, App.showRemaining,
         DevMode.isEnabled, DevMode.spend, DevMode.hasMaxBudget, DevMode.maxBudget,
         DevMode.hasReset, DevMode.daysRemaining, DevMode.totalDays, DevMode.unlocked,
         DevLog.requests,
-        ChartUI.unifiedChartMetric, ChartUI.unifiedChartModel, ChartUI.modelSpendRange
+        ChartUI.unifiedChartMetric, ChartUI.unifiedChartModel, ChartUI.modelSpendRange,
+        Update.lastCheck, Update.latestVersion, Update.latestPublishedAt, Update.dismissedVersion,
+        Update.checkEnabled
     ]
+
+    static func loadShowRemaining(from defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: App.showRemaining)
+    }
+
+    static func saveShowRemaining(_ value: Bool, to defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: App.showRemaining)
+    }
 }

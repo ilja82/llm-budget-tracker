@@ -46,10 +46,21 @@ struct BudgetInfo: Codable {
     }
 
     func usageText(_ mode: MenuBarDisplayMode) -> String {
+        usageText(mode, showRemaining: false)
+    }
+
+    func usageText(_ mode: MenuBarDisplayMode, showRemaining: Bool) -> String {
         if mode == .percentage, let maxBudget, maxBudget > 0 {
-            return String(format: "%.0f%%", (spend / maxBudget) * 100)
+            let share = showRemaining ? max(maxBudget - spend, 0) / maxBudget : spend / maxBudget
+            return String(format: "%.0f%%", share * 100)
         }
         return String(format: "$%.2f", spend)
+    }
+
+    func fillFraction(showRemaining: Bool) -> Double {
+        guard let maxBudget, maxBudget > 0 else { return 0 }
+        let used = min(1.0, spend / maxBudget)
+        return showRemaining ? min(1.0, 1.0 - used) : used
     }
 
     func withUserId(_ userId: String) -> Self {

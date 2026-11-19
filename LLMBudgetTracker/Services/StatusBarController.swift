@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class StatusBarController {
     let viewModel = BudgetViewModel()
+    let updateViewModel = UpdateViewModel()
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
@@ -13,6 +14,8 @@ final class StatusBarController {
         setupPopover()
         setupButton()
         observeViewModel()
+        observeUpdateViewModel()
+        updateViewModel.start()
     }
 
     // MARK: - Setup
@@ -24,7 +27,9 @@ final class StatusBarController {
         let controller = NSHostingController(
             rootView: PopoverView(closePopover: { [weak self] in
                 self?.popover.performClose(nil)
-            }).environment(viewModel)
+            })
+            .environment(viewModel)
+            .environment(updateViewModel)
         )
         hostingViewController = controller
         popover.contentViewController = controller
@@ -44,6 +49,7 @@ final class StatusBarController {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            updateViewModel.reevaluate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             updatePopoverSize()
             popover.contentViewController?.view.window?.makeKey()
@@ -89,6 +95,17 @@ final class StatusBarController {
         }
     }
 
+    private func observeUpdateViewModel() {
+        withObservationTracking {
+            _ = updateViewModel.availableUpdate
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.updatePopoverSize()
+                self?.observeUpdateViewModel()
+            }
+        }
+    }
+
     private func updatePopoverSize() {
         guard let view = hostingViewController?.view else { return }
         let fittedHeight = view.fittingSize.height
@@ -119,7 +136,7 @@ final class StatusBarController {
         case .refreshing:
             return "Refreshing budget"
         case .loaded:
-            return "Used \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
+            return "\(viewModel.usageLabel) \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
         }
     }
 }

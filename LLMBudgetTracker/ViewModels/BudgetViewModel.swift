@@ -36,6 +36,10 @@ final class BudgetViewModel {
         didSet { UserDefaults.standard.set(dailyActivityEnabled, forKey: StorageKeys.App.dailyActivityEnabled) }
     }
 
+    var showRemaining: Bool = StorageKeys.loadShowRemaining() {
+        didSet { StorageKeys.saveShowRemaining(showRemaining) }
+    }
+
     // MARK: - State
 
     private(set) var budgetInfo: BudgetInfo? {
@@ -73,7 +77,7 @@ final class BudgetViewModel {
     var menuBarText: String {
         if appState == .offline, budgetInfo == nil { return "⏳" }
         guard let info = budgetInfo else { return "$--" }
-        return info.usageText(displayMode)
+        return info.usageText(displayMode, showRemaining: showRemaining)
     }
 
     var menuBarTooltip: String {
@@ -126,8 +130,7 @@ final class BudgetViewModel {
     }
 
     var budgetPercentage: Double {
-        guard let info = budgetInfo, let max = info.maxBudget, max > 0 else { return 0 }
-        return min(1.0, info.spend / max)
+        budgetInfo?.fillFraction(showRemaining: showRemaining) ?? 0
     }
 
     var dailySpend: [(date: Date, amount: Double)] {

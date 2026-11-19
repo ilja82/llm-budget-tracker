@@ -53,7 +53,15 @@ targets:
       - path: LLMBudgetTracker/Models/TeamInfo.swift
       - path: LLMBudgetTracker/Models/SpendLog.swift
       - path: LLMBudgetTracker/Models/ChartSelection.swift
+      - path: LLMBudgetTracker/Models/DailyCostBreakdown.swift
+      - path: LLMBudgetTracker/Models/DailySpendHover.swift
+      - path: LLMBudgetTracker/Models/DashboardStats.swift
       - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
+      - path: LLMBudgetTracker/Models/StorageKeys.swift
+      - path: LLMBudgetTracker/Models/UpdatePolicy.swift
+      - path: LLMBudgetTracker/Services/UpdateChecker.swift
+      - path: LLMBudgetTracker/Services/NetworkMonitor.swift
+      - path: LLMBudgetTracker/ViewModels/UpdateViewModel.swift
     settings:
       base:
         SWIFT_VERSION: "6.0"
