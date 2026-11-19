@@ -33,12 +33,11 @@ enum ModelRange: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    /// UTC date bounds matching the API's daily `yyyy-MM-dd` values; the end is exclusive.
-    func dateRange(relativeTo now: Date) -> Range<String>? {
+    func dateRange(relativeTo now: Date, localTimeZone: TimeZone = .current) -> Range<String>? {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
         calendar.firstWeekday = 2 // Monday, regardless of the user's locale.
-        let today = calendar.startOfDay(for: now)
+        let today = dailyActivityEndDate(now: now, localTimeZone: localTimeZone)
         let start: Date?
         let end: Date?
         switch self {

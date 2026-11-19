@@ -56,6 +56,7 @@ targets:
       - path: LLMBudgetTracker/Models/DailyCostBreakdown.swift
       - path: LLMBudgetTracker/Models/DailySpendHover.swift
       - path: LLMBudgetTracker/Models/DashboardStats.swift
+      - path: LLMBudgetTracker/Models/DailyActivityEndDate.swift
       - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
       - path: LLMBudgetTracker/Models/StorageKeys.swift
       - path: LLMBudgetTracker/Models/UpdatePolicy.swift
