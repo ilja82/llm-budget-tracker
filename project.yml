@@ -52,6 +52,8 @@ targets:
       - path: LLMBudgetTracker/Models/TeamInfo.swift
       - path: LLMBudgetTracker/Models/SpendLog.swift
       - path: LLMBudgetTracker/Models/ChartSelection.swift
+      - path: LLMBudgetTracker/Models/DailyCostBreakdown.swift
+      - path: LLMBudgetTracker/Models/DashboardStats.swift
       - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
       - path: LLMBudgetTracker/Models/StorageKeys.swift
       - path: LLMBudgetTracker/Models/UpdatePolicy.swift
