@@ -13,12 +13,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - New "This week" and "Last week" ranges in the per-model spend breakdown.
 - New "Quit App" button in the popover.
 - The popover tells you when a newer version is available and how to update it with Homebrew.
+- New dashboard window with the daily cost per model and more statistics and charts.
 
 ### For users
 
 #### Added
 
 - **Quit App** button next to "Settings" in the popover header.
+- **Dashboard window:** "Details" below the per-model spend chart opens a resizable window with two pages, using the
+  same range as the per-model chart. "Daily costs" lists each day with the total reported by LiteLLM and its parts per
+  model ($ and % of the day). Spend LiteLLM does not attribute to a model shows as "Other / unattributed" (or
+  "Unattributed" for days without a breakdown); if the parts add up to more than the total, the day is marked
+  "parts ≠ total". "Statistics" shows tiles for total spend, average per active day, most expensive day, requests,
+  failure rate, tokens, cost per 1K tokens and top model, plus charts for daily tokens, daily requests, spend share
+  by model and spend by weekday. Both pages use the daily activity data that is already loaded; no new requests.
 - **Update notice:** when a newer release is available, a banner at the top of the popover shows the new and the
   current version and the steps to update (`brew update`, `brew upgrade --cask llm-budget-tracker`, quit the app,
   start it again). "Copy Commands" copies both commands; "Dismiss" hides the notice until a newer version comes out.
@@ -67,6 +75,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `GET /repos/ilja82/llm-budget-tracker/releases/latest` with its own ephemeral `URLSession`, version compare and
   12-hour rules in the pure `UpdatePolicy.availableUpdate`, new `update.*` keys in `StorageKeys`. Covered by
   `UpdatePolicyTests` and `UpdateViewModelTests`.
+- **`DailyCostBreakdown`, `DashboardStats`:** pure functions behind the dashboard (day rows with per-model parts,
+  summary values and chart series), sharing one range filter. Covered by `DailyCostBreakdownTests` and
+  `DashboardStatsTests`.
 - **`TeamInfo.swift`:** decoding of `GET /team/info` (team-level budget).
 - **`ConnectionSettings.swift`:** testable form logic for the connection settings (form validation, which API key is
   used for testing, whether a key is saved).

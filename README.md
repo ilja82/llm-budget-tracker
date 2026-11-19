@@ -13,6 +13,7 @@ LiteLLM proxy and displays daily activity charts.
 - Opens a popover with remaining budget, reset timing, projected spend, and pacing details.
 - Optionally loads daily activity data for spend, token usage, and request success/failure charts, filterable by model.
 - Breaks down spend per model for "This month", "Last 28 days", "This week", and "Last week" (weeks run Monday to Sunday).
+- Opens a dashboard window with the daily cost per model and statistics on spend, tokens, requests and models.
   Like the daily API data, these ranges are based on UTC.
 - Shows spend even without a configured budget limit. Remaining budget and projections require a limit;
   daily charts require neither a limit nor a budget reset time.

@@ -11,5 +11,14 @@ struct LLMBudgetTrackerApp: App {
                 .environment(statusBarController.updateViewModel)
         }
         .windowResizability(.contentSize)
+
+        Window("Dashboard", id: DailyCostDetailView.windowID) {
+            DailyCostDetailView()
+                .environment(statusBarController.viewModel)
+        }
+        .defaultSize(width: 720, height: 560)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+        .windowResizability(.contentMinSize)
     }
 }
