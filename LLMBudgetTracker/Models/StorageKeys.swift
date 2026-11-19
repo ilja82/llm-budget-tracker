@@ -30,6 +30,14 @@ enum StorageKeys {
         static let modelSpendRange    = "ui.modelSpend.range"
     }
 
+    enum Update {
+        static let lastCheck         = "update.lastCheck"
+        static let latestVersion     = "update.latestVersion"
+        static let latestPublishedAt = "update.latestPublishedAt"
+        static let dismissedVersion  = "update.dismissedVersion"
+        static let checkEnabled      = "update.checkEnabled"
+    }
+
     /// All keys that resetToInitialState() must wipe. Add new keys here alongside their definition.
     static let allKeys: [String] = [
         App.endpointURL, App.updateIntervalMinutes, App.displayMode,
@@ -37,6 +45,8 @@ enum StorageKeys {
         DevMode.isEnabled, DevMode.spend, DevMode.hasMaxBudget, DevMode.maxBudget,
         DevMode.hasReset, DevMode.daysRemaining, DevMode.totalDays, DevMode.unlocked,
         DevLog.requests,
-        ChartUI.unifiedChartMetric, ChartUI.unifiedChartModel, ChartUI.modelSpendRange
+        ChartUI.unifiedChartMetric, ChartUI.unifiedChartModel, ChartUI.modelSpendRange,
+        Update.lastCheck, Update.latestVersion, Update.latestPublishedAt, Update.dismissedVersion,
+        Update.checkEnabled
     ]
 }

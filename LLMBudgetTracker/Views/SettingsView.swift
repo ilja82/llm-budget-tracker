@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(BudgetViewModel.self) private var viewModel
+    @Environment(UpdateViewModel.self) private var updateViewModel
     @State private var proxyURL: String = ""
     @State private var newAPIKey: String = ""
     @State private var connectionStatus: ConnectionStatus = .idle
@@ -26,6 +27,7 @@ struct SettingsView: View {
         Form {
             connectionSection
             startupSection
+            updatesSection
             usageDataSection
             displaySection(vm: $vm)
             refreshSection(vm: $vm)
@@ -191,6 +193,23 @@ struct SettingsView: View {
             }
         } header: {
             Text("Startup")
+        }
+    }
+
+    // MARK: - Updates Section
+
+    private var updatesSection: some View {
+        Section {
+            Toggle("Check for Updates", isOn: Binding(
+                get: { updateViewModel.isEnabled },
+                set: { updateViewModel.isEnabled = $0 }
+            ))
+            Text("Asks GitHub every 12 hours whether a newer version exists and shows a notice in the popup."
+                 + " Nothing is installed automatically.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Updates")
         }
     }
 

@@ -3,6 +3,7 @@ import SwiftUI
 struct PopoverView: View {
     var closePopover: () -> Void = {}
     @Environment(BudgetViewModel.self) private var viewModel
+    @Environment(UpdateViewModel.self) private var updateViewModel
     @Environment(\.openSettings) private var openSettings
 
     @State private var isRefreshing = false
@@ -15,6 +16,10 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if let update = updateViewModel.availableUpdate {
+                UpdateNoticeView(update: update)
+                Divider()
+            }
             if viewModel.appState == .notConfigured {
                 notConfiguredView
             } else {

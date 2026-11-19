@@ -23,6 +23,9 @@ LiteLLM proxy and displays daily activity charts.
   wins. For keys that belong to a team, the user limit is skipped, because LiteLLM ignores it by default. Levels without
   a limit or without access are skipped. In the Developer Mode request log, `limits_found` shows which limits were found.
 - If no limit is found, the user data (spend) is shown.
+- Shows a notice in the popover when a newer release is available, with the steps to update via Homebrew. For this it
+  asks the GitHub releases API at most every 12 hours (sending only the app version as User-Agent); turn it off with
+  `Check for Updates` in Settings.
 
 ## Install the app
 
