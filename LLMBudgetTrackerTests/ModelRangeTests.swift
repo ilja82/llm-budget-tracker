@@ -42,9 +42,13 @@ final class ModelRangeTests: XCTestCase {
         )
     }
 
-    func testLastWeekUsesUTC() throws {
+    func testLastWeekFollowsLocalDateInBerlin() throws {
         XCTAssertEqual(
-            try dates(.lastWeek, at: "2026-10-12T01:00:00+02:00"),
+            try dates(.lastWeek, at: "2026-10-11T22:18:00Z", zone: "Europe/Berlin"),
+            "2026-10-05"..<"2026-10-12"
+        )
+        XCTAssertEqual(
+            try dates(.lastWeek, at: "2026-10-11T21:59:00Z", zone: "Europe/Berlin"),
             "2026-09-28"..<"2026-10-05"
         )
     }
@@ -79,10 +83,39 @@ final class ModelRangeTests: XCTestCase {
         )
     }
 
-    func testWeekUsesUTCEvenWhenTimestampHasOffset() throws {
+    func testThisWeekStartsAtLocalMondayMidnightInBerlin() throws {
         XCTAssertEqual(
-            try dates(.thisWeek, at: "2026-10-12T01:00:00+02:00"),
+            try dates(.thisWeek, at: "2026-10-11T22:18:00Z", zone: "Europe/Berlin"),
+            "2026-10-12"..<"2026-10-19"
+        )
+        XCTAssertEqual(
+            try dates(.thisWeek, at: "2026-10-11T21:59:00Z", zone: "Europe/Berlin"),
             "2026-10-05"..<"2026-10-12"
+        )
+    }
+
+    func testThisWeekKeepsUTCDayWestOfUTC() throws {
+        XCTAssertEqual(
+            try dates(.thisWeek, at: "2026-10-12T03:00:00Z", zone: "America/Los_Angeles"),
+            "2026-10-12"..<"2026-10-19"
+        )
+    }
+
+    func testThisMonthStartsAtLocalMidnightOnTheFirstInBerlin() throws {
+        XCTAssertEqual(
+            try dates(.thisMonth, at: "2026-05-31T22:18:00Z", zone: "Europe/Berlin"),
+            "2026-06-01"..<"2026-07-01"
+        )
+        XCTAssertEqual(
+            try dates(.thisMonth, at: "2026-05-31T21:59:00Z", zone: "Europe/Berlin"),
+            "2026-05-01"..<"2026-06-01"
+        )
+    }
+
+    func testLast28EndsOnNewLocalDayInBerlin() throws {
+        XCTAssertEqual(
+            try dates(.last28, at: "2026-05-01T22:18:00Z", zone: "Europe/Berlin"),
+            "2026-04-05"..<"2026-05-03"
         )
     }
 
@@ -143,8 +176,9 @@ final class ModelRangeTests: XCTestCase {
         }
     }
 
-    private func dates(_ range: ModelRange, at timestamp: String) throws -> Range<String> {
+    private func dates(_ range: ModelRange, at timestamp: String, zone: String = "UTC") throws -> Range<String> {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: timestamp))
-        return try XCTUnwrap(range.dateRange(relativeTo: now))
+        let timeZone = try XCTUnwrap(TimeZone(identifier: zone))
+        return try XCTUnwrap(range.dateRange(relativeTo: now, localTimeZone: timeZone))
     }
 }

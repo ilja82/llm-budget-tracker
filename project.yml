@@ -46,6 +46,7 @@ targets:
       - path: LLMBudgetTracker/Services/EndpointSecurity.swift
       - path: LLMBudgetTracker/Services/APIService.swift
       - path: LLMBudgetTracker/Services/ResponseSanitizer.swift
+      - path: LLMBudgetTracker/Services/RefreshBackoff.swift
       - path: LLMBudgetTracker/Models/BudgetInfo.swift
       - path: LLMBudgetTracker/Models/TeamMemberInfo.swift
       - path: LLMBudgetTracker/Models/KeyInfo.swift
@@ -56,6 +57,7 @@ targets:
       - path: LLMBudgetTracker/Models/DailyCostBreakdown.swift
       - path: LLMBudgetTracker/Models/DailySpendHover.swift
       - path: LLMBudgetTracker/Models/DashboardStats.swift
+      - path: LLMBudgetTracker/Models/DailyActivityEndDate.swift
       - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
       - path: LLMBudgetTracker/Models/StorageKeys.swift
       - path: LLMBudgetTracker/Models/MenuBarIconStyle.swift
