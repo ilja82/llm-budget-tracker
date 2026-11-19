@@ -44,8 +44,8 @@ final class RemainingDisplayTests: XCTestCase {
         }
     }
 
-    func testFillFractionNegativeSpendFollowsFormula() {
-        XCTAssertEqual(info(spend: -10, max: 100).fillFraction(showRemaining: true), 1.1, accuracy: 0.0001)
+    func testFillFractionNegativeSpendStaysWithinUnitRange() {
+        XCTAssertEqual(info(spend: -10, max: 100).fillFraction(showRemaining: true), 1)
     }
 
     func testPreferenceDefaultsToFalseAndPersists() throws {
@@ -54,8 +54,17 @@ final class RemainingDisplayTests: XCTestCase {
         defer { suite.removePersistentDomain(forName: name) }
         XCTAssertFalse(StorageKeys.loadShowRemaining(from: suite))
         StorageKeys.saveShowRemaining(true, to: suite)
+        XCTAssertEqual(suite.object(forKey: StorageKeys.App.showRemaining) as? Bool, true)
         let reread = try XCTUnwrap(UserDefaults(suiteName: name))
         XCTAssertTrue(StorageKeys.loadShowRemaining(from: reread))
         XCTAssertTrue(StorageKeys.allKeys.contains(StorageKeys.App.showRemaining))
+    }
+
+    func testLoadReadsValueSeededAtKey() throws {
+        let name = "RemainingDisplayTests.\(UUID().uuidString)"
+        let suite = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { suite.removePersistentDomain(forName: name) }
+        suite.set(true, forKey: StorageKeys.App.showRemaining)
+        XCTAssertTrue(StorageKeys.loadShowRemaining(from: suite))
     }
 }

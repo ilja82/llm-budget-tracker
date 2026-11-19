@@ -60,7 +60,7 @@ struct BudgetInfo: Codable {
     func fillFraction(showRemaining: Bool) -> Double {
         guard let maxBudget, maxBudget > 0 else { return 0 }
         let used = min(1.0, spend / maxBudget)
-        return showRemaining ? 1.0 - used : used
+        return showRemaining ? min(1.0, 1.0 - used) : used
     }
 
     func withUserId(_ userId: String) -> Self {

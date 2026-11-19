@@ -57,13 +57,10 @@ targets:
       - path: LLMBudgetTracker/Models/DashboardStats.swift
       - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
       - path: LLMBudgetTracker/Models/StorageKeys.swift
-<<<<<<< 1278239e838822fbdce75252d504e3e181977b25
       - path: LLMBudgetTracker/Models/UpdatePolicy.swift
       - path: LLMBudgetTracker/Services/UpdateChecker.swift
       - path: LLMBudgetTracker/Services/NetworkMonitor.swift
       - path: LLMBudgetTracker/ViewModels/UpdateViewModel.swift
-=======
->>>>>>> 0ac6a3300fe2875507fc44306b32918f3ab02de9
     settings:
       base:
         SWIFT_VERSION: "6.0"
