@@ -5,6 +5,7 @@ struct UnifiedActivityChartView: View {
     @Environment(BudgetViewModel.self) private var viewModel
     @AppStorage(StorageKeys.ChartUI.unifiedChartMetric) private var metricRaw: String = MetricKind.spend.rawValue
     @AppStorage(StorageKeys.ChartUI.unifiedChartModel) private var selectedModel: String = ""
+    @State private var hoveredDay: Date?
 
     private static let dateFmt: DateFormatter = {
         let f = DateFormatter()
@@ -126,12 +127,6 @@ struct UnifiedActivityChartView: View {
 
     // MARK: Spend
 
-    private struct SpendPoint: Identifiable {
-        let id: String
-        let date: Date
-        let amount: Double
-    }
-
     private var spendPoints: [SpendPoint] {
         viewModel.dailyActivity
             .sorted { $0.date < $1.date }
@@ -208,6 +203,18 @@ struct UnifiedActivityChartView: View {
                 .cornerRadius(2)
             }
 
+            if let day = hoveredDay, let hover = DailySpendHover.value(at: day, in: points) {
+                RuleMark(x: .value("Hovered day", hover.day, unit: .day))
+                    .foregroundStyle(Color.secondary.opacity(0.35))
+                    .annotation(
+                        position: .top,
+                        spacing: 2,
+                        overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
+                    ) {
+                        hoverLabel(hover)
+                    }
+            }
+
             if !safeLine.isEmpty {
                 ForEach(safeLine, id: \.date) { point in
                     LineMark(
@@ -245,8 +252,48 @@ struct UnifiedActivityChartView: View {
             }
         }
         .chartYScale(domain: 0 ... spendYMax)
+        .chartOverlay { proxy in hoverOverlay(proxy: proxy) }
         .frame(height: 180)
         .accessibilityLabel(spendAccessibilityLabel(points: points))
+    }
+
+    private func hoverLabel(_ hover: DailySpendHoverValue) -> some View {
+        VStack(spacing: 0) {
+            Text(hover.day, format: .dateTime.month().day())
+            Text(DailySpendHover.amountText(hover.amount)).fontWeight(.semibold)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+    }
+
+    private func hoverOverlay(proxy: ChartProxy) -> some View {
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(.clear)
+                .contentShape(Rectangle())
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let location):
+                        guard let plotAnchor = proxy.plotFrame else {
+                            hoveredDay = nil
+                            return
+                        }
+                        let plot = geometry[plotAnchor]
+                        guard plot.contains(location),
+                              let date = proxy.value(atX: location.x - plot.origin.x, as: Date.self)
+                        else {
+                            hoveredDay = nil
+                            return
+                        }
+                        let day = Calendar.current.startOfDay(for: date)
+                        if hoveredDay != day { hoveredDay = day }
+                    case .ended:
+                        hoveredDay = nil
+                    }
+                }
+        }
     }
 
     private func barColor(for point: SpendPoint, safeLimitByDay: [Date: Double]) -> Color {
