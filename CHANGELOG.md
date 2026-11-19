@@ -46,6 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Changed
 
+- **Slower polling after repeated errors:** after 9 failed refreshes in a row the app polls once per hour instead of
+  every 30 seconds to 5 minutes. The first successful refresh restores the normal interval.
 - **macOS 27 or later is now required.** The app is built for macOS 27; Macs on macOS 26 can keep using v0.0.8.
 - **No budget limit is no longer an error.** Instead of "No budget found", the popover shows your spend so far and
   explains that remaining budget and pacing require a limit. The menu bar tooltip reads "Used: … / No budget limit
