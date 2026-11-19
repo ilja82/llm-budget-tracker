@@ -110,13 +110,13 @@ final class BudgetViewModel {
         let remaining = max(maxBudget - spend, 0)
         let daysRemaining = pacingInfo?.daysRemaining ?? 0
         let projected = pacingInfo?.predictedTotal ?? 0
-        return [
+        return ([
             String(format: "Used: $%.2f of $%.2f", spend, maxBudget),
             String(format: "Remaining: $%.2f", remaining),
             "Reset in: \(daysRemaining) day\(daysRemaining == 1 ? "" : "s")",
             "Status: \(pacingStatus.label)",
             String(format: "Projected by reset: $%.2f", projected)
-        ].joined(separator: "\n")
+        ] + [info.temporaryIncrease?.tooltipText].compactMap { $0 }).joined(separator: "\n")
     }
 
     var pacingBarColor: Color { pacingStatus.color }
@@ -735,7 +735,7 @@ final class BudgetViewModel {
         fields.append(.init(name: "budget_reset_at",
                             value: info.budgetResetAt.map { Self.iso8601Display.string(from: $0) } ?? "nil"))
         fields.append(.init(name: "user_email", value: info.userEmail == nil ? "nil" : "[REDACTED]"))
-        return fields
+        return fields + Self.temporaryIncreaseFields(info)
     }
 
     private func spendLogsFields(_ logs: [SpendLog]) -> [APIRequestLog.ExtractedField] {

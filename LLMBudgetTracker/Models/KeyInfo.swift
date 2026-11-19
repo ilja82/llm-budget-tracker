@@ -25,6 +25,8 @@ struct KeyInfoDetails: Codable {
     let budgetResetAt: Date?
     let budgetLimits: [BudgetWindow]?
     let budgetLimitsUsage: [String: BudgetWindowUsage]?
+    /// `metadata.temp_budget_increase` / `metadata.temp_budget_expiry`; nil when missing or unreadable.
+    let temporaryIncrease: TemporaryBudgetIncrease?
 
     enum CodingKeys: String, CodingKey {
         case teamId = "team_id"
@@ -35,6 +37,10 @@ struct KeyInfoDetails: Codable {
         case budgetResetAt = "budget_reset_at"
         case budgetLimits = "budget_limits"
         case budgetLimitsUsage = "budget_limits_usage"
+    }
+
+    private enum MetadataKeys: String, CodingKey {
+        case metadata
     }
 
     init(from decoder: Decoder) throws {
@@ -51,6 +57,10 @@ struct KeyInfoDetails: Codable {
         budgetLimitsUsage = try? container.decodeIfPresent(
             [String: BudgetWindowUsage].self, forKey: .budgetLimitsUsage
         )
+        let metadata = try? decoder.container(keyedBy: MetadataKeys.self).nestedContainer(
+            keyedBy: TemporaryBudgetIncrease.CodingKeys.self, forKey: .metadata
+        )
+        temporaryIncrease = TemporaryBudgetIncrease.decode(from: metadata)
     }
 
     /// One entry per budget window whose current spend LiteLLM reports.
@@ -68,14 +78,18 @@ struct KeyInfoDetails: Codable {
         }
     }
 
-    func toBudgetInfo() -> BudgetInfo {
-        BudgetInfo(
+    /// The key level. An increase active at `now` raises `max_budget`; without `max_budget` it is ignored.
+    /// The `budget_limits` windows never include it.
+    func toBudgetInfo(now: Date) -> BudgetInfo {
+        let increase = maxBudget == nil ? nil : temporaryIncrease?.active(at: now)
+        return BudgetInfo(
             userId: userId ?? "",
             spend: spend ?? 0,
-            maxBudget: maxBudget,
+            maxBudget: maxBudget.map { $0 + (increase?.amount ?? 0) },
             budgetDuration: budgetDuration,
             budgetResetAt: budgetResetAt,
-            userEmail: nil
+            userEmail: nil,
+            temporaryIncrease: increase
         )
     }
 }

@@ -282,6 +282,104 @@ final class BudgetUsageTests: XCTestCase {
         XCTAssertEqual(result.limitSources, "")
     }
 
+    func testActiveKeyTemporaryIncreaseRaisesTheKeyCap() async throws {
+        let result = try await fetch(scenario: "key-temp-active")
+
+        XCTAssertEqual(result.endpoint, "/key/info")
+        XCTAssertEqual(result.info.maxBudget, 150)
+        XCTAssertEqual(result.info.remainingBudget, 60)
+        XCTAssertEqual(result.info.temporaryIncrease?.amount, 50)
+    }
+
+    func testExpiredKeyTemporaryIncreaseKeepsTheBaseCap() async throws {
+        let result = try await fetch(scenario: "key-temp-expired")
+
+        XCTAssertEqual(result.endpoint, "/key/info")
+        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertNil(result.info.temporaryIncrease)
+    }
+
+    func testUnreadableKeyTemporaryIncreaseKeepsTheBaseCap() async throws {
+        let result = try await fetch(scenario: "key-temp-bad")
+
+        XCTAssertEqual(result.endpoint, "/key/info")
+        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertNil(result.info.temporaryIncrease)
+    }
+
+    func testKeyTemporaryIncreaseChangesTheLeastRemainingChoice() async throws {
+        let raised = try await fetch(scenario: "key-temp-vs-member")
+        let base = try await fetch(scenario: "key-vs-member")
+
+        XCTAssertEqual(raised.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(raised.info.remainingBudget, 20)
+        XCTAssertNil(raised.info.temporaryIncrease)
+        XCTAssertEqual(base.endpoint, "/key/info")
+        XCTAssertEqual(base.info.remainingBudget, 10)
+    }
+
+    func testKeyTemporaryIncreaseWithoutKeyCapIsIgnored() async throws {
+        let result = try await fetch(scenario: "key-temp-no-max")
+
+        XCTAssertEqual(result.endpoint, "/v2/user/info")
+        XCTAssertNil(result.info.maxBudget)
+        XCTAssertNil(result.info.temporaryIncrease)
+    }
+
+    func testKeyTemporaryIncreaseDoesNotRaiseBudgetWindows() async throws {
+        let result = try await fetch(scenario: "key-temp-window")
+
+        XCTAssertEqual(result.endpoint, "/key/info budget_limits[1d]")
+        XCTAssertEqual(result.info.maxBudget, 5)
+        XCTAssertNil(result.info.temporaryIncrease)
+        XCTAssertTrue(result.limitSources.contains("/key/info: $10.00 of $150.00"))
+    }
+
+    func testActiveMemberTemporaryIncreaseRaisesTheMemberCap() async throws {
+        let result = try await fetch(scenario: "member-temp-active")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 150)
+        XCTAssertEqual(result.info.temporaryIncrease?.amount, 50)
+    }
+
+    func testMemberTemporaryIncreaseExpiringNowKeepsTheBaseCap() async throws {
+        let result = try await fetch(scenario: "member-temp-expired")
+
+        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertNil(result.info.temporaryIncrease)
+    }
+
+    func testUnreadableMemberTemporaryIncreaseKeepsTheBaseCap() async throws {
+        let result = try await fetch(scenario: "member-temp-bad")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 100)
+    }
+
+    func testMemberTemporaryIncreaseInMetadataIsNotRead() async throws {
+        let result = try await fetch(scenario: "member-temp-in-metadata-ignored")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 100)
+        XCTAssertNil(result.info.temporaryIncrease)
+    }
+
+    func testMemberTemporaryIncreaseRaisesTheTeamDefaultMemberBudget() async throws {
+        let result = try await fetch(scenario: "member-default-with-temp")
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.maxBudget, 70)
+        XCTAssertEqual(result.info.temporaryIncrease?.amount, 20)
+    }
+
+    func testMemberTemporaryIncreaseWithoutAnyMemberCapIsIgnored() async throws {
+        let result = try await fetch(scenario: "member-temp-no-default")
+
+        XCTAssertEqual(result.endpoint, "/v2/user/info")
+        XCTAssertNil(result.info.maxBudget)
+    }
+
     private func fetch(scenario: String) async throws -> BudgetFetchResult {
         try await makeAPI().fetchResolvedBudgetInfo(
             baseURL: "https://\(scenario).invalid", apiKey: "fixture-key"
@@ -291,7 +389,7 @@ final class BudgetUsageTests: XCTestCase {
     private func makeAPI() -> APIService {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BudgetFixtureURLProtocol.self]
-        return APIService(configuration: configuration)
+        return APIService(configuration: configuration, now: { Date(timeIntervalSince1970: 1_780_272_000) })
     }
 }
 
@@ -439,6 +537,90 @@ private final class BudgetFixtureURLProtocol: URLProtocol, @unchecked Sendable {
         "key-malformed.invalid": [
             "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":"n/a","max_budget":"n/a"}}"#),
             "/v2/user/info": (200, #"{"user_id":"fixture-user","spend":12.5,"max_budget":100}"#)
+        ],
+        "key-temp-active.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"spend":90,"max_budget":100,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-06-02T00:00:00"}}}
+                """#)
+        ],
+        "key-temp-expired.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"spend":90,"max_budget":100,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-05-31T23:59:59Z"}}}
+                """#)
+        ],
+        "key-temp-bad.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"spend":90,"max_budget":100,
+                "metadata":{"temp_budget_increase":"50","temp_budget_expiry":"tomorrow"}}}
+                """#)
+        ],
+        "key-temp-vs-member.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"team_id":"team-fixture","spend":90,"max_budget":100,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-06-02T00:00:00+00:00"}}}
+                """#),
+            member: (200, #"{"user_id":"fixture-user","spend":30,"litellm_budget_table":{"max_budget":50}}"#)
+        ],
+        "key-vs-member.invalid": [
+            "/key/info": (200, #"{"info":{"team_id":"team-fixture","spend":90,"max_budget":100}}"#),
+            member: (200, #"{"user_id":"fixture-user","spend":30,"litellm_budget_table":{"max_budget":50}}"#)
+        ],
+        "key-temp-no-max.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"spend":5,"max_budget":null,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-06-02"}}}
+                """#)
+        ],
+        "key-temp-window.invalid": [
+            "/key/info": (200, #"""
+                {"info":{"user_id":"fixture-user","spend":10,"max_budget":100,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-06-02T00:00:00Z"},
+                "budget_limits":[{"budget_duration":"1d","max_budget":5}],
+                "budget_limits_usage":{"1d":{"current_spend":4}}}}
+                """#)
+        ],
+        "member-temp-active.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":90,"litellm_budget_table":{"max_budget":100,
+                "temp_budget_increase":50,"temp_budget_expiry":"2026-06-02T00:00:00.000000Z"}}
+                """#)
+        ],
+        "member-temp-expired.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":90,"litellm_budget_table":{"max_budget":100,
+                "temp_budget_increase":50,"temp_budget_expiry":"2026-06-01T00:00:00"}}
+                """#)
+        ],
+        "member-temp-bad.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":90,"litellm_budget_table":{"max_budget":100,
+                "temp_budget_increase":"lots","temp_budget_expiry":5}}
+                """#)
+        ],
+        "member-temp-in-metadata-ignored.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":90,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-06-02T00:00:00Z"},
+                "litellm_budget_table":{"max_budget":100,
+                "metadata":{"temp_budget_increase":50,"temp_budget_expiry":"2026-06-02T00:00:00Z"}}}
+                """#)
+        ],
+        "member-default-with-temp.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":6,"litellm_budget_table":{"max_budget":null,
+                "temp_budget_increase":20,"temp_budget_expiry":"2026-06-02T00:00:00Z"}}
+                """#),
+            "/team/info": (200, #"""
+                {"team_id":"team-fixture","team_info":{"spend":9,"team_member_budget_table":{"max_budget":50}}}
+                """#)
+        ],
+        "member-temp-no-default.invalid": [
+            member: (200, #"""
+                {"user_id":"fixture-user","spend":6,"litellm_budget_table":{"max_budget":null,
+                "temp_budget_increase":20,"temp_budget_expiry":"2026-06-02T00:00:00Z"}}
+                """#)
         ]
     ]
 
