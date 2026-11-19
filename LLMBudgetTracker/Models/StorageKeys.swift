@@ -7,6 +7,7 @@ enum StorageKeys {
         static let displayMode           = "displayMode"
         static let dailyActivityEnabled  = "dailyActivityEnabled"
         static let dailyActivityCache    = "dailyActivity.cache"
+        static let showRemaining         = "showRemaining"
     }
 
     enum DevMode {
@@ -41,7 +42,7 @@ enum StorageKeys {
     /// All keys that resetToInitialState() must wipe. Add new keys here alongside their definition.
     static let allKeys: [String] = [
         App.endpointURL, App.updateIntervalMinutes, App.displayMode,
-        App.dailyActivityEnabled, App.dailyActivityCache,
+        App.dailyActivityEnabled, App.dailyActivityCache, App.showRemaining,
         DevMode.isEnabled, DevMode.spend, DevMode.hasMaxBudget, DevMode.maxBudget,
         DevMode.hasReset, DevMode.daysRemaining, DevMode.totalDays, DevMode.unlocked,
         DevLog.requests,
@@ -49,4 +50,12 @@ enum StorageKeys {
         Update.lastCheck, Update.latestVersion, Update.latestPublishedAt, Update.dismissedVersion,
         Update.checkEnabled
     ]
+
+    static func loadShowRemaining(from defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: App.showRemaining)
+    }
+
+    static func saveShowRemaining(_ value: Bool, to defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: App.showRemaining)
+    }
 }
