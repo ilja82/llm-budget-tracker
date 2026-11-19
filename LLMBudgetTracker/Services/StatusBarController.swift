@@ -136,7 +136,7 @@ final class StatusBarController {
         case .refreshing:
             return "Refreshing budget"
         case .loaded:
-            return "Used \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
+            return "\(viewModel.usageLabel) \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
         }
     }
 }

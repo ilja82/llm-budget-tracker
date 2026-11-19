@@ -150,6 +150,10 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            Toggle("Show remaining instead of used", isOn: vm.showRemaining)
+            Text("Counts percentages and the menu bar fill down from 100%.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         } header: {
             Text("Display")
         }
