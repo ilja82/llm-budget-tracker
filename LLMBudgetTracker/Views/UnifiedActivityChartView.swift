@@ -209,7 +209,7 @@ struct UnifiedActivityChartView: View {
                     .annotation(
                         position: .top,
                         spacing: 2,
-                        overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
+                        overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
                     ) {
                         hoverLabel(hover)
                     }
@@ -255,45 +255,6 @@ struct UnifiedActivityChartView: View {
         .chartOverlay { proxy in hoverOverlay(proxy: proxy) }
         .frame(height: 180)
         .accessibilityLabel(spendAccessibilityLabel(points: points))
-    }
-
-    private func hoverLabel(_ hover: DailySpendHoverValue) -> some View {
-        VStack(spacing: 0) {
-            Text(hover.day, format: .dateTime.month().day())
-            Text(DailySpendHover.amountText(hover.amount)).fontWeight(.semibold)
-        }
-        .font(.caption2)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
-    }
-
-    private func hoverOverlay(proxy: ChartProxy) -> some View {
-        GeometryReader { geometry in
-            Rectangle()
-                .fill(.clear)
-                .contentShape(Rectangle())
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location):
-                        guard let plotAnchor = proxy.plotFrame else {
-                            hoveredDay = nil
-                            return
-                        }
-                        let plot = geometry[plotAnchor]
-                        guard plot.contains(location),
-                              let date = proxy.value(atX: location.x - plot.origin.x, as: Date.self)
-                        else {
-                            hoveredDay = nil
-                            return
-                        }
-                        let day = Calendar.current.startOfDay(for: date)
-                        if hoveredDay != day { hoveredDay = day }
-                    case .ended:
-                        hoveredDay = nil
-                    }
-                }
-        }
     }
 
     private func barColor(for point: SpendPoint, safeLimitByDay: [Date: Double]) -> Color {
@@ -465,5 +426,46 @@ struct UnifiedActivityChartView: View {
         guard let earliest = dates.min(), let latest = dates.max() else { return 1 }
         let spanDays = max(1, Calendar.current.dateComponents([.day], from: earliest, to: latest).day ?? 1)
         return max(1, spanDays / 5)
+    }
+}
+
+private extension UnifiedActivityChartView {
+    func hoverLabel(_ hover: DailySpendHoverValue) -> some View {
+        VStack(spacing: 0) {
+            Text(hover.day, format: .dateTime.month().day())
+            Text(DailySpendHover.amountText(hover.amount)).fontWeight(.semibold)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+    }
+
+    func hoverOverlay(proxy: ChartProxy) -> some View {
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(.clear)
+                .contentShape(Rectangle())
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let location):
+                        guard let plotAnchor = proxy.plotFrame else {
+                            hoveredDay = nil
+                            return
+                        }
+                        let plot = geometry[plotAnchor]
+                        guard plot.contains(location),
+                              let date = proxy.value(atX: location.x - plot.origin.x, as: Date.self)
+                        else {
+                            hoveredDay = nil
+                            return
+                        }
+                        let day = Calendar.current.startOfDay(for: date)
+                        if hoveredDay != day { hoveredDay = day }
+                    case .ended:
+                        hoveredDay = nil
+                    }
+                }
+        }
     }
 }

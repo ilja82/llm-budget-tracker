@@ -36,6 +36,7 @@ final class DailySpendHoverTests: XCTestCase {
         XCTAssertEqual(DailySpendHover.amountText(0.004), "$0.00")
         XCTAssertEqual(DailySpendHover.amountText(12.5), "$12.50")
         XCTAssertEqual(DailySpendHover.amountText(0), "$0.00")
+        XCTAssertEqual(DailySpendHover.amountText(-0.0), "$0.00")
     }
 
     func testGapInsideRangeShowsZeroAndOutsideRangeShowsNothing() {

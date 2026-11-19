@@ -30,6 +30,6 @@ enum DailySpendHover {
     }
 
     static func amountText(_ amount: Double) -> String {
-        String(format: "$%.2f", amount)
+        String(format: "$%.2f", amount == 0 ? 0 : amount)
     }
 }
