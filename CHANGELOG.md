@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 #### Changed
 
+- **macOS 27 or later is now required.** The app is built for macOS 27; Macs on macOS 26 can keep using v0.0.8.
 - **No budget limit is no longer an error.** Instead of "No budget found", the popover shows your spend so far and
   explains that remaining budget and pacing require a limit. The menu bar tooltip reads "Used: … / No budget limit
   configured."
@@ -84,5 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`EndpointSecurity`:** the loopback allow list contains `[::1]` (the host as reported by `URLComponents`), and
   empty hosts are rejected.
 - **SwiftLint** now also lints `LLMBudgetTrackerTests`.
+- **Toolchain:** the project targets Xcode 27 (`xcodeVersion: "27.0"` in `project.yml`) and macOS 27.0 as the
+  deployment target (was Xcode 26.5 and macOS 26.0). CI must build on a macOS 27 runner with Xcode 27.
 
 [Unreleased]: https://github.com/ilja82/llm-budget-tracker/compare/v0.0.8...HEAD
