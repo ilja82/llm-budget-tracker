@@ -555,7 +555,7 @@ final class BudgetViewModel {
             return
         }
         let fmt = Self.dailyFmt
-        let today = Date()
+        let today = dailyActivityEndDate(now: Date())
         let cache = loadCachedActivity()
 
         let startDate = Self.computeFetchStartDate(today: today, cache: cache)
