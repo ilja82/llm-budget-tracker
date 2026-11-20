@@ -1,5 +1,6 @@
 included:
   - LLMBudgetTracker
+  - LLMBudgetTrackerTests
 
 excluded:
   - LLMBudgetTracker.xcodeproj

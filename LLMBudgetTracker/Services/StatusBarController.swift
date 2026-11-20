@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class StatusBarController {
     let viewModel = BudgetViewModel()
+    let updateViewModel = UpdateViewModel()
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
@@ -13,6 +14,8 @@ final class StatusBarController {
         setupPopover()
         setupButton()
         observeViewModel()
+        observeUpdateViewModel()
+        updateViewModel.start()
     }
 
     // MARK: - Setup
@@ -24,7 +27,9 @@ final class StatusBarController {
         let controller = NSHostingController(
             rootView: PopoverView(closePopover: { [weak self] in
                 self?.popover.performClose(nil)
-            }).environment(viewModel)
+            })
+            .environment(viewModel)
+            .environment(updateViewModel)
         )
         hostingViewController = controller
         popover.contentViewController = controller
@@ -44,6 +49,7 @@ final class StatusBarController {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            updateViewModel.reevaluate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             updatePopoverSize()
             popover.contentViewController?.view.window?.makeKey()
@@ -58,7 +64,8 @@ final class StatusBarController {
 
     private func updateImage() {
         guard let button = statusItem.button else { return }
-        let img = progressBarImage(
+        let img = MenuBarIconRenderer.image(
+            style: viewModel.iconStyle,
             progress: viewModel.budgetPercentage,
             color: viewModel.pacingBarNSColor,
             label: viewModel.menuBarText
@@ -76,6 +83,7 @@ final class StatusBarController {
         withObservationTracking {
             _ = viewModel.budgetPercentage
             _ = viewModel.menuBarText
+            _ = viewModel.iconStyle
             _ = viewModel.pacingBarNSColor
             _ = viewModel.menuBarTooltip
             _ = viewModel.appState
@@ -85,6 +93,17 @@ final class StatusBarController {
                 self?.updateImage()
                 self?.updatePopoverSize()
                 self?.observeViewModel()
+            }
+        }
+    }
+
+    private func observeUpdateViewModel() {
+        withObservationTracking {
+            _ = updateViewModel.availableUpdate
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.updatePopoverSize()
+                self?.observeUpdateViewModel()
             }
         }
     }
@@ -111,7 +130,7 @@ final class StatusBarController {
         case .invalidData:
             return "Invalid response data"
         case .noBudget:
-            return "No budget available"
+            return "Used \(viewModel.menuBarText), no budget limit"
         case .unknownError:
             return "Unknown error"
         case .loading:
@@ -119,56 +138,7 @@ final class StatusBarController {
         case .refreshing:
             return "Refreshing budget"
         case .loaded:
-            return "Used \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
+            return "\(viewModel.usageLabel) \(viewModel.menuBarText), pacing \(viewModel.pacingStatus.label)"
         }
-    }
-}
-
-// MARK: - Image Drawing
-
-private func progressBarImage(progress: Double, color: NSColor, label: String) -> NSImage {
-    let height: CGFloat = NSStatusBar.system.thickness
-    let barH: CGFloat = height - 2        // 1pt padding top and bottom
-    let fontSize: CGFloat = (barH * 0.62).rounded()
-    let textWidth = NSAttributedString(
-        string: label,
-        attributes: [.font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)]
-    ).size().width
-    let width: CGFloat = max(textWidth + 16, 44)
-
-    return NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
-        let barY = (rect.height - barH) / 2
-        let barRect = CGRect(x: 0.5, y: barY, width: rect.width - 1, height: barH)
-        let radius = barH / 4
-
-        // Track
-        NSColor.quaternaryLabelColor.setFill()
-        NSBezierPath(roundedRect: barRect, xRadius: radius, yRadius: radius).fill()
-
-        // Fill
-        let fillW = barRect.width * CGFloat(min(1.0, max(0.0, progress)))
-        if fillW > 0 {
-            var fillRect = barRect
-            fillRect.size.width = fillW
-            color.withAlphaComponent(0.85).setFill()
-            NSBezierPath(roundedRect: fillRect, xRadius: radius, yRadius: radius).fill()
-        }
-
-        // Border
-        let border = NSBezierPath(roundedRect: barRect.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
-        border.lineWidth = 1
-        NSColor.secondaryLabelColor.withAlphaComponent(0.5).setStroke()
-        border.stroke()
-
-        // Label
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold),
-            .foregroundColor: NSColor.labelColor
-        ]
-        let str = NSAttributedString(string: label, attributes: attrs)
-        let sz = str.size()
-        str.draw(at: NSPoint(x: (width - sz.width) / 2, y: barY + (barH - sz.height) / 2))
-
-        return true
     }
 }

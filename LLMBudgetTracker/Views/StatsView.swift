@@ -26,7 +26,7 @@ struct StatsView: View {
             case .rateLimited:
                 if let info = viewModel.budgetInfo {
                     VStack(alignment: .leading, spacing: 10) {
-                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
                         errorCard(
                             title: "Requests paused",
                             message: viewModel.errorMessage ??
@@ -49,7 +49,7 @@ struct StatsView: View {
             case .offline:
                 if let info = viewModel.budgetInfo {
                     VStack(alignment: .leading, spacing: 10) {
-                        BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                        BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
                         offlineCard
                     }
                 } else {
@@ -60,19 +60,14 @@ struct StatsView: View {
                     title: "Invalid response data",
                     message: "LLM Budget Tracker received incomplete or malformed budget data."
                 )
-            case .noBudget:
-                errorCard(
-                    title: "No budget found",
-                    message: "Your LiteLLM account does not currently have budget data available."
-                )
             case .unknownError:
                 errorCard(
                     title: "Something went wrong",
                     message: viewModel.errorMessage ?? "An unexpected error occurred."
                 )
-            case .loaded, .refreshing:
+            case .loaded, .refreshing, .noBudget:
                 if let info = viewModel.budgetInfo {
-                    BudgetCard(info: info, pacing: viewModel.pacingInfo)
+                    BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
                 }
             }
         }
@@ -123,6 +118,7 @@ struct StatsView: View {
 struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
+    var teamBudget: BudgetInfo?
 
     private var statusColor: Color {
         pacing?.status.color ?? fallbackStatusColor
@@ -149,6 +145,15 @@ struct BudgetCard: View {
         return "Resets in \(Swift.max(0, days))d"
     }
 
+    private var teamWarningText: String? {
+        guard let teamBudget, let maxBudget = teamBudget.maxBudget else { return nil }
+        return String(
+            format: "Team budget: $%.2f of $%.2f left. Requests stop when the team budget runs out.",
+            teamBudget.remainingBudget,
+            maxBudget
+        )
+    }
+
     private var fallbackForecastText: String? {
         guard let maxBudget = info.maxBudget else { return nil }
         let remaining = Swift.max(maxBudget - info.spend, 0)
@@ -163,7 +168,7 @@ struct BudgetCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Remaining")
+                        Text(info.hasBudgetLimit ? "Remaining" : "Spent")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
 
@@ -173,9 +178,10 @@ struct BudgetCard: View {
                                 .foregroundStyle(statusColor)
                                 .accessibilityLabel(heroAccessibilityLabel(remaining: remaining))
                         } else {
-                            Text("—")
+                            Text(currency(info.spend))
                                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
+                                .accessibilityLabel(String(format: "Spent so far: $%.2f", info.spend))
                         }
 
                         if let resetText {
@@ -211,6 +217,25 @@ struct BudgetCard: View {
                 Text(forecastText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("No budget limit configured. Usage is available, but remaining budget and pacing are not.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let increase = info.temporaryIncrease, info.hasBudgetLimit {
+                Text(increase.includedText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let teamWarningText {
+                Label(teamWarningText, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
