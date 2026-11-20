@@ -85,6 +85,12 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
   -scheme LLMBudgetTracker -destination 'platform=macOS' test CODE_SIGNING_ALLOWED=NO
 ```
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to build, lint and
+test, and follow the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Report security problems privately as described in
+[`SECURITY.md`](SECURITY.md).
+
 ## License
 
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
