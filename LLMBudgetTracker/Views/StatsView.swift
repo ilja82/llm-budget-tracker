@@ -225,6 +225,13 @@ struct BudgetCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if let increase = info.temporaryIncrease, info.hasBudgetLimit {
+                Text(increase.includedText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if let teamWarningText {
                 Label(teamWarningText, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)

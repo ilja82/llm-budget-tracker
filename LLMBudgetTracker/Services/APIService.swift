@@ -41,8 +41,10 @@ actor APIService {
 
     private let session: URLSession
     private let decoder: JSONDecoder
+    private let now: @Sendable () -> Date
 
-    init(configuration: URLSessionConfiguration = .ephemeral) {
+    init(configuration: URLSessionConfiguration = .ephemeral, now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
         configuration.timeoutIntervalForRequest = Constants.requestTimeoutSeconds
         configuration.timeoutIntervalForResource = Constants.resourceTimeoutSeconds
         configuration.httpShouldSetCookies = false
@@ -173,7 +175,7 @@ actor APIService {
         try validate(response)
         let rawJSON = sanitizedLogBody(from: data)
         let member = try decoder.decode(TeamMemberInfoResponse.self, from: data)
-        return (member.toBudgetInfo(), rawJSON, statusCode)
+        return (member.toBudgetInfo(now: now()), rawJSON, statusCode)
     }
 
     func fetchDailyActivity(
@@ -210,7 +212,7 @@ actor APIService {
 
     private func keyCandidates(_ keyInfo: KeyInfoFetch) -> [BudgetCandidate] {
         guard let details = keyInfo.details else { return [] }
-        let info = details.toBudgetInfo()
+        let info = details.toBudgetInfo(now: now())
         let limits = (info.hasBudgetLimit ? [("/key/info", info)] : [])
             + details.windowBudgets().map { ("/key/info budget_limits[\($0.budgetDuration ?? "")]", $0) }
         return limits.map { endpoint, info in
@@ -248,7 +250,8 @@ actor APIService {
         return TeamSources(member: memberCandidate, team: teamCandidate, unavailable: unavailable)
     }
 
-    /// The member's own limit, else the team's default member budget; nil without either.
+    /// The member's own limit, else the team's default member budget plus the member's active
+    /// temporary increase; nil without either.
     private static func effectiveMemberBudget(member: BudgetInfo, team: TeamInfoDetails?) -> BudgetInfo? {
         if member.hasBudgetLimit { return member }
         guard let defaultBudget = team?.teamMemberBudgetTable,
@@ -256,10 +259,11 @@ actor APIService {
         return BudgetInfo(
             userId: member.userId,
             spend: member.spend,
-            maxBudget: maxBudget,
+            maxBudget: maxBudget + (member.temporaryIncrease?.amount ?? 0),
             budgetDuration: defaultBudget.budgetDuration,
             budgetResetAt: defaultBudget.budgetResetAt,
-            userEmail: member.userEmail
+            userEmail: member.userEmail,
+            temporaryIncrease: member.temporaryIncrease
         )
     }
 

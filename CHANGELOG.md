@@ -43,6 +43,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Keep the saved API key:** if an API key is already stored, you can change only the proxy URL and leave the API key
   field empty. "Test Connection" then uses the saved key, and "Save" keeps it unchanged. A hint below the field
   explains this.
+- **LiteLLM temporary budget increases:** while a key or team-member budget has an active "Temporary Budget Increase"
+  (expiry in the future), the app uses the raised cap (`max_budget` + increase), like LiteLLM does, for the remaining
+  budget, percentage, pacing and the choice of the most limited level. A member without its own budget gets the
+  increase on top of the team's default member budget. The popover shows "Includes temporary +$X until …" and the
+  menu bar tooltip lists the increase. After the expiry the base cap is back with the next refresh. Key
+  `budget_limits` windows are not raised.
 
 #### Changed
 
@@ -85,6 +91,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   used for testing, whether a key is saved).
 - **`limits_found`** field in the Developer Mode request log, listing every limit that was found,
   e.g. `/key/info: $7.00 of $25.00, /v2/user/info: $12.50 of $100.00`.
+- **`TemporaryBudgetIncrease`:** reads `metadata.temp_budget_increase` / `metadata.temp_budget_expiry` from
+  `/key/info` and `litellm_budget_table.temp_budget_increase` / `temp_budget_expiry` from `/team/{id}/members/me`.
+  `activeAmount(at:)` decides whether an increase is active. `APIService.init` takes an injectable `now` clock.
+  New request log fields `temp_budget_increase` and `temp_budget_expiry`. Covered by `TemporaryBudgetIncreaseTests`
+  and new `BudgetUsageTests` scenarios.
 
 #### Changed
 
