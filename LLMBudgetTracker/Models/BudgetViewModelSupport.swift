@@ -34,31 +34,9 @@ extension BudgetViewModel {
 
     /// Summed spend per model-group across `range`, ranked descending.
     func modelGroupSpendTotals(range: ModelRange) -> [(model: String, spend: Double)] {
-        // Build cutoff in a UTC calendar so it matches the basis of `DailySpendData.date`
-        // (UTC "yyyy-MM-dd"). Using `Calendar.current` would roll to the prior UTC day
-        // in east-of-UTC zones and leak an extra day into the totals.
-        var utcCal = Calendar(identifier: .gregorian)
-        utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
-        let today = Date()
-        let cutoffComponents: DateComponents
-        switch range {
-        case .thisMonth:
-            cutoffComponents = utcCal.dateComponents([.year, .month], from: today)
-        case .last28:
-            let startOfToday = utcCal.startOfDay(for: today)
-            guard let start = utcCal.date(byAdding: .day, value: -27, to: startOfToday) else {
-                return []
-            }
-            cutoffComponents = utcCal.dateComponents([.year, .month, .day], from: start)
-        }
-        let cutoffStr = String(
-            format: "%04d-%02d-%02d",
-            cutoffComponents.year ?? 0,
-            cutoffComponents.month ?? 0,
-            cutoffComponents.day ?? 1
-        )
+        guard let dates = range.dateRange(relativeTo: Date()) else { return [] }
         var totals: [String: Double] = [:]
-        for entry in dailyActivity where entry.date >= cutoffStr {
+        for entry in dailyActivity where dates.contains(entry.date) {
             guard let groups = entry.breakdown?.perModel else { continue }
             for (name, group) in groups {
                 totals[name, default: 0] += group.metrics.spend

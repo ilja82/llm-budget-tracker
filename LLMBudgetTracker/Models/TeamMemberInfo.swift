@@ -25,16 +25,18 @@ struct TeamMemberInfoResponse: Codable {
     }
 
     /// Map the team-member row onto BudgetInfo so pacing/UI consume it unchanged.
-    /// A missing budget table (or max_budget) yields maxBudget == nil, which the
-    /// view model treats as the existing `.noBudget` state.
-    func toBudgetInfo() -> BudgetInfo {
-        BudgetInfo(
+    /// A missing budget table (or max_budget) yields maxBudget == nil. An increase active at `now`
+    /// raises max_budget; without max_budget it is kept for the team default member budget.
+    func toBudgetInfo(now: Date) -> BudgetInfo {
+        let increase = litellmBudgetTable?.temporaryIncrease?.active(at: now)
+        return BudgetInfo(
             userId: userId,
             spend: spend,
-            maxBudget: litellmBudgetTable?.maxBudget,
+            maxBudget: litellmBudgetTable?.maxBudget.map { $0 + (increase?.amount ?? 0) },
             budgetDuration: litellmBudgetTable?.budgetDuration,
             budgetResetAt: litellmBudgetTable?.budgetResetAt,
-            userEmail: userEmail
+            userEmail: userEmail,
+            temporaryIncrease: increase
         )
     }
 }
@@ -45,6 +47,8 @@ struct LiteLLMBudgetTable: Codable {
     let maxBudget: Double?
     let budgetDuration: String?
     let budgetResetAt: Date?
+    /// `temp_budget_increase` / `temp_budget_expiry`; nil when missing or unreadable.
+    let temporaryIncrease: TemporaryBudgetIncrease?
 
     enum CodingKeys: String, CodingKey {
         case maxBudget = "max_budget"
@@ -56,6 +60,9 @@ struct LiteLLMBudgetTable: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         maxBudget = try container.decodeIfPresent(Double.self, forKey: .maxBudget)
         budgetDuration = try container.decodeIfPresent(String.self, forKey: .budgetDuration)
-        budgetResetAt = try container.decodeIfPresent(Date.self, forKey: .budgetResetAt)
+        budgetResetAt = try? container.decodeIfPresent(Date.self, forKey: .budgetResetAt)
+        temporaryIncrease = TemporaryBudgetIncrease.decode(
+            from: try? decoder.container(keyedBy: TemporaryBudgetIncrease.CodingKeys.self)
+        )
     }
 }

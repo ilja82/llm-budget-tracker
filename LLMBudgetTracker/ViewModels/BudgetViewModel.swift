@@ -32,8 +32,13 @@ final class BudgetViewModel {
         didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: StorageKeys.App.displayMode) }
     }
 
+    var iconStyle = MenuBarIconStyle.load() { didSet { iconStyle.save() } }
     var dailyActivityEnabled: Bool = UserDefaults.standard.bool(forKey: StorageKeys.App.dailyActivityEnabled) {
         didSet { UserDefaults.standard.set(dailyActivityEnabled, forKey: StorageKeys.App.dailyActivityEnabled) }
+    }
+
+    var showRemaining: Bool = StorageKeys.loadShowRemaining() {
+        didSet { StorageKeys.saveShowRemaining(showRemaining) }
     }
 
     // MARK: - State
@@ -41,6 +46,8 @@ final class BudgetViewModel {
     private(set) var budgetInfo: BudgetInfo? {
         didSet { _safeSpendLine = nil }
     }
+    /// The shared team budget when it has less remaining than `budgetInfo`.
+    private(set) var teamBudget: BudgetInfo?
     private(set) var spendLogs: [SpendLog] = [] {
         didSet { _dailySpend = nil; _safeSpendLine = nil }
     }
@@ -71,13 +78,7 @@ final class BudgetViewModel {
     var menuBarText: String {
         if appState == .offline, budgetInfo == nil { return "⏳" }
         guard let info = budgetInfo else { return "$--" }
-        switch displayMode {
-        case .dollar:
-            return String(format: "$%.2f", info.spend)
-        case .percentage:
-            guard let max = info.maxBudget, max > 0 else { return "N/A" }
-            return String(format: "%.0f%%", (info.spend / max) * 100)
-        }
+        return info.usageText(displayMode, showRemaining: showRemaining)
     }
 
     var menuBarTooltip: String {
@@ -95,7 +96,7 @@ final class BudgetViewModel {
         case .invalidData:
             return "Invalid response data\nCheck your LiteLLM proxy."
         case .noBudget:
-            return "No budget found\nNo budget data is available."
+            return "Used: \(menuBarText)\nNo budget limit configured."
         case .unknownError:
             return "Unknown error\nTry refreshing."
         default:
@@ -109,13 +110,13 @@ final class BudgetViewModel {
         let remaining = max(maxBudget - spend, 0)
         let daysRemaining = pacingInfo?.daysRemaining ?? 0
         let projected = pacingInfo?.predictedTotal ?? 0
-        return [
+        return ([
             String(format: "Used: $%.2f of $%.2f", spend, maxBudget),
             String(format: "Remaining: $%.2f", remaining),
             "Reset in: \(daysRemaining) day\(daysRemaining == 1 ? "" : "s")",
             "Status: \(pacingStatus.label)",
             String(format: "Projected by reset: $%.2f", projected)
-        ].joined(separator: "\n")
+        ] + [info.temporaryIncrease?.tooltipText].compactMap { $0 }).joined(separator: "\n")
     }
 
     var pacingBarColor: Color { pacingStatus.color }
@@ -130,8 +131,7 @@ final class BudgetViewModel {
     }
 
     var budgetPercentage: Double {
-        guard let info = budgetInfo, let max = info.maxBudget, max > 0 else { return 0 }
-        return min(1.0, info.spend / max)
+        budgetInfo?.fillFraction(showRemaining: showRemaining) ?? 0
     }
 
     var dailySpend: [(date: Date, amount: Double)] {
@@ -276,6 +276,7 @@ final class BudgetViewModel {
         }
         guard !endpointURL.isEmpty else {
             budgetInfo = nil
+            teamBudget = nil
             spendLogs = []
             dailyActivity = []
             pacingInfo = nil
@@ -285,6 +286,7 @@ final class BudgetViewModel {
         }
         guard let apiKey = try? KeychainService.load(), !apiKey.isEmpty else {
             budgetInfo = nil
+            teamBudget = nil
             spendLogs = []
             dailyActivity = []
             pacingInfo = nil
@@ -334,7 +336,10 @@ final class BudgetViewModel {
             statusCode: result.keyInfo.statusCode,
             responseBody: result.keyInfo.rawJSON,
             errorMessage: nil,
-            extractedFields: [.init(name: "team_id", value: result.keyInfo.teamId ?? "nil")]
+            extractedFields: [
+                .init(name: "team_id", value: result.keyInfo.teamId ?? "nil"),
+                .init(name: "limits_found", value: result.limitSources.isEmpty ? "none" : result.limitSources)
+            ]
         )
         logAPIRequest(
             endpoint: result.endpoint,
@@ -343,14 +348,8 @@ final class BudgetViewModel {
             errorMessage: nil,
             extractedFields: budgetInfoFields(info)
         )
-        guard info.maxBudget != nil else {
-            budgetInfo = info
-            clearDailyActivityData()
-            pacingInfo = nil
-            appState = .noBudget
-            return
-        }
         budgetInfo = info
+        teamBudget = result.teamBudget
         if dailyActivityEnabled {
             await fetchLogs(apiKey: apiKey, info: info)
         } else {
@@ -358,7 +357,7 @@ final class BudgetViewModel {
         }
         computePacing(from: info)
         lastUpdated = Date()
-        appState = .loaded
+        appState = info.hasBudgetLimit ? .loaded : .noBudget
         errorMessage = nil
     }
 
@@ -468,6 +467,7 @@ final class BudgetViewModel {
             userEmail: "dev@test.local"
         )
         budgetInfo = fakeBudgetInfo
+        teamBudget = nil
         if dailyActivityEnabled {
             let billingStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
             let actualDaysPassed = max(1, (calendar.dateComponents([.day], from: billingStart, to: now).day ?? 0) + 1)
@@ -551,12 +551,12 @@ final class BudgetViewModel {
     }
 
     private func fetchLogs(apiKey: String, info: BudgetInfo) async {
-        guard info.budgetResetAt != nil else {
+        guard info.canLoadDailyActivity else {
             clearDailyActivityData()
             return
         }
         let fmt = Self.dailyFmt
-        let today = Date()
+        let today = dailyActivityEndDate(now: Date())
         let cache = loadCachedActivity()
 
         let startDate = Self.computeFetchStartDate(today: today, cache: cache)
@@ -735,7 +735,7 @@ final class BudgetViewModel {
         fields.append(.init(name: "budget_reset_at",
                             value: info.budgetResetAt.map { Self.iso8601Display.string(from: $0) } ?? "nil"))
         fields.append(.init(name: "user_email", value: info.userEmail == nil ? "nil" : "[REDACTED]"))
-        return fields
+        return fields + Self.temporaryIncreaseFields(info)
     }
 
     private func spendLogsFields(_ logs: [SpendLog]) -> [APIRequestLog.ExtractedField] {

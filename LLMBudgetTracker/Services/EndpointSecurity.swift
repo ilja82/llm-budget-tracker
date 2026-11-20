@@ -4,7 +4,7 @@ enum EndpointSecurity {
     private static let allowedLoopbackHosts: Set<String> = [
         "localhost",
         "127.0.0.1",
-        "::1"
+        "[::1]"
     ]
 
     static func normalizedBaseURL(from rawValue: String) throws -> URL {
@@ -13,6 +13,7 @@ enum EndpointSecurity {
               let components = URLComponents(string: trimmed),
               let scheme = components.scheme?.lowercased(),
               let host = components.host?.lowercased(),
+              !host.isEmpty,
               components.user == nil,
               components.password == nil,
               components.query == nil,

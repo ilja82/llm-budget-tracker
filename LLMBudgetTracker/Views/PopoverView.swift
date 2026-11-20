@@ -3,7 +3,9 @@ import SwiftUI
 struct PopoverView: View {
     var closePopover: () -> Void = {}
     @Environment(BudgetViewModel.self) private var viewModel
+    @Environment(UpdateViewModel.self) private var updateViewModel
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     @State private var isRefreshing = false
     @State private var refreshError: String?
@@ -15,6 +17,10 @@ struct PopoverView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if let update = updateViewModel.availableUpdate {
+                UpdateNoticeView(update: update)
+                Divider()
+            }
             if viewModel.appState == .notConfigured {
                 notConfiguredView
             } else {
@@ -25,6 +31,8 @@ struct PopoverView: View {
                             UnifiedActivityChartView()
                                 .transition(.opacity)
                             ModelSpendBreakdownChartView()
+                                .transition(.opacity)
+                            detailsButton
                                 .transition(.opacity)
                         }
                         secondaryControlsSection
@@ -65,18 +73,44 @@ struct PopoverView: View {
                 NSApp.activate(ignoringOtherApps: true)
                 Task { @MainActor in openSettings() }
             } label: {
-                Label("Settings", systemImage: "gear")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                headerButtonLabel("Settings", systemImage: "gear")
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens the settings window")
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                headerButtonLabel("Quit App", systemImage: "power")
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Quits LLM Budget Tracker")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+    }
+
+    private var detailsButton: some View {
+        HStack {
+            Spacer()
+            Button {
+                closePopover()
+                NSApp.activate(ignoringOtherApps: true)
+                Task { @MainActor in openWindow(id: DailyCostDetailView.windowID) }
+            } label: {
+                headerButtonLabel("Details", systemImage: "chart.bar.doc.horizontal")
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the dashboard with daily costs per model and more statistics")
+        }
+    }
+
+    private func headerButtonLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
     }
 
     private var notConfiguredView: some View {

@@ -3,11 +3,6 @@ import Foundation
 // MARK: - Connectivity & Refresh Scheduling
 
 extension BudgetViewModel {
-    /// Backoff bounds used to poll faster than the normal update interval while
-    /// the last refresh is failing (e.g. an outage), capped so we never hammer.
-    private static let baseRetrySeconds: Double = 30
-    private static let maxRetrySeconds: Double = 300
-
     /// The state to show while a refresh is in flight. When offline we surface the
     /// "Waiting for connection…" card instead of a spinner that would otherwise stay
     /// up for the whole outage (the request waits via `waitsForConnectivity`).
@@ -30,17 +25,15 @@ extension BudgetViewModel {
     func startTimer() {
         timerTask = Task { [weak self] in
             await self?.refresh()
-            var retryDelay = Self.baseRetrySeconds
+            var consecutiveFailures = 0
             while !Task.isCancelled {
                 let seconds: Double
                 if self?.isInErrorState == true {
-                    // Last refresh failed: poll faster with capped exponential backoff
-                    // so we recover during an outage without waiting the full interval.
-                    seconds = retryDelay
-                    retryDelay = min(retryDelay * 2, Self.maxRetrySeconds)
+                    consecutiveFailures += 1
+                    seconds = Double(RefreshBackoff.delaySeconds(consecutiveFailures: consecutiveFailures))
                 } else {
+                    consecutiveFailures = 0
                     seconds = Double(self?.updateIntervalMinutes ?? 60) * 60
-                    retryDelay = Self.baseRetrySeconds
                 }
                 try? await Task.sleep(for: .seconds(seconds))
                 if Task.isCancelled { break }
