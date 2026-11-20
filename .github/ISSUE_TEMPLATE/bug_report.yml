@@ -1,0 +1,63 @@
+name: Bug report
+description: Report something that does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+        **Never paste a real LiteLLM API key, proxy URL or other credentials.** Replace them with placeholders.
+        Report security problems privately, as described in the security policy, not here.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown in Settings, or run `brew info --cask ilja82/tap/llm-budget-tracker`.
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: e.g. macOS 27.0
+    validations:
+      required: true
+  - type: input
+    id: litellm-version
+    attributes:
+      label: LiteLLM version
+      description: The version of your LiteLLM proxy, if you know it.
+      placeholder: e.g. 1.80.0
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the popover
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages or logs. Remove API keys and proxy URLs first.
+    validations:
+      required: true
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed all API keys, proxy URLs and other credentials from this report.
+          required: true
