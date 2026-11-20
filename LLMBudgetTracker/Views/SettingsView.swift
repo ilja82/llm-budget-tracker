@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(BudgetViewModel.self) private var viewModel
+    @Environment(UpdateViewModel.self) private var updateViewModel
     @State private var proxyURL: String = ""
     @State private var newAPIKey: String = ""
     @State private var connectionStatus: ConnectionStatus = .idle
@@ -26,6 +27,7 @@ struct SettingsView: View {
         Form {
             connectionSection
             startupSection
+            updatesSection
             usageDataSection
             displaySection(vm: $vm)
             refreshSection(vm: $vm)
@@ -76,6 +78,12 @@ struct SettingsView: View {
                 .onChange(of: newAPIKey) { _, _ in
                     connectionStatus = .idle
                 }
+
+            if apiKeyConfigured {
+                Text("Leave the API key empty to keep using the saved key.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "lock.fill")
@@ -142,6 +150,15 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            Picker("Menu Bar Icon", selection: vm.iconStyle) {
+                ForEach(MenuBarIconStyle.allCases) { style in
+                    Text(style.label).tag(style)
+                }
+            }
+            Toggle("Show remaining instead of used", isOn: vm.showRemaining)
+            Text("Counts percentages and the menu bar fill down from 100%.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         } header: {
             Text("Display")
         }
@@ -185,6 +202,23 @@ struct SettingsView: View {
             }
         } header: {
             Text("Startup")
+        }
+    }
+
+    // MARK: - Updates Section
+
+    private var updatesSection: some View {
+        Section {
+            Toggle("Check for Updates", isOn: Binding(
+                get: { updateViewModel.isEnabled },
+                set: { updateViewModel.isEnabled = $0 }
+            ))
+            Text("Asks GitHub every 12 hours whether a newer version exists and shows a notice in the popup."
+                 + " Nothing is installed automatically.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Updates")
         }
     }
 
@@ -271,11 +305,11 @@ struct SettingsView: View {
     // MARK: - Helpers
 
     private var isFormFilled: Bool {
-        !proxyURL.isEmpty && !newAPIKey.isEmpty
+        connectionSettings.isFormFilled
     }
 
-    private var isProxyURLValid: Bool {
-        (try? EndpointSecurity.normalizedBaseURLString(from: proxyURL)) != nil
+    private var connectionSettings: ConnectionSettings {
+        ConnectionSettings(proxyURL: proxyURL, newAPIKey: newAPIKey, apiKeyConfigured: apiKeyConfigured)
     }
 
     private var proxyURLValidationMessage: String? {
@@ -289,7 +323,7 @@ struct SettingsView: View {
     }
 
     private var canSave: Bool {
-        !proxyURL.isEmpty && !newAPIKey.isEmpty && isProxyURLValid
+        connectionSettings.canSave
     }
 
     private var isTesting: Bool {
@@ -302,19 +336,24 @@ struct SettingsView: View {
             connectionStatus = .result(proxyURLErrorMessage, false)
             return
         }
+        let settings = connectionSettings
         connectionStatus = .testing
         Task {
-            let result = await viewModel.testConnection(url: normalizedURL, apiKey: newAPIKey)
-            connectionStatus = .result(result.message, result.isSuccess)
+            do {
+                let apiKey = try settings.apiKeyForTesting(load: KeychainService.load)
+                let result = await viewModel.testConnection(url: normalizedURL, apiKey: apiKey)
+                connectionStatus = .result(result.message, result.isSuccess)
+            } catch {
+                connectionStatus = .result(error.localizedDescription, false)
+            }
         }
     }
 
     private func saveConnection() {
-        guard !proxyURL.isEmpty,
-              !newAPIKey.isEmpty,
+        guard canSave,
               let normalizedURL = try? EndpointSecurity.normalizedBaseURLString(from: proxyURL) else { return }
         do {
-            try KeychainService.save(newAPIKey)
+            try connectionSettings.saveAPIKeyIfNeeded(save: KeychainService.save)
             viewModel.endpointURL = normalizedURL
             proxyURL = normalizedURL
             viewModel.clearDailyActivityData()

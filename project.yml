@@ -2,15 +2,15 @@ name: LLMBudgetTracker
 options:
   bundleIdPrefix: com.ilja82
   deploymentTarget:
-    macOS: "26.0"
-  xcodeVersion: "26.5"
+    macOS: "27.0"
+  xcodeVersion: "27.0"
   createIntermediateGroups: true
 
 targets:
   LLMBudgetTracker:
     type: application
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "27.0"
     sources:
       - path: LLMBudgetTracker
         excludes:
@@ -22,7 +22,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker
         SWIFT_VERSION: "6.0"
-        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        MACOSX_DEPLOYMENT_TARGET: "27.0"
         CODE_SIGN_ENTITLEMENTS: LLMBudgetTracker/LLMBudgetTracker.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
@@ -36,3 +36,47 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.ilja82.llm-budget-tracker.debug
           INFOPLIST_KEY_CFBundleDisplayName: LLM Budget Tracker (Debug)
+
+  LLMBudgetTrackerTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: LLMBudgetTrackerTests
+      - path: LLMBudgetTracker/Models/ConnectionSettings.swift
+      - path: LLMBudgetTracker/Services/EndpointSecurity.swift
+      - path: LLMBudgetTracker/Services/APIService.swift
+      - path: LLMBudgetTracker/Services/ResponseSanitizer.swift
+      - path: LLMBudgetTracker/Services/RefreshBackoff.swift
+      - path: LLMBudgetTracker/Models/BudgetInfo.swift
+      - path: LLMBudgetTracker/Models/TeamMemberInfo.swift
+      - path: LLMBudgetTracker/Models/KeyInfo.swift
+      - path: LLMBudgetTracker/Models/TemporaryBudgetIncrease.swift
+      - path: LLMBudgetTracker/Models/TeamInfo.swift
+      - path: LLMBudgetTracker/Models/SpendLog.swift
+      - path: LLMBudgetTracker/Models/ChartSelection.swift
+      - path: LLMBudgetTracker/Models/DailyCostBreakdown.swift
+      - path: LLMBudgetTracker/Models/DailySpendHover.swift
+      - path: LLMBudgetTracker/Models/DashboardStats.swift
+      - path: LLMBudgetTracker/Models/DailyActivityEndDate.swift
+      - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
+      - path: LLMBudgetTracker/Models/StorageKeys.swift
+      - path: LLMBudgetTracker/Models/MenuBarIconStyle.swift
+      - path: LLMBudgetTracker/Services/MenuBarIconRenderer.swift
+      - path: LLMBudgetTracker/Models/UpdatePolicy.swift
+      - path: LLMBudgetTracker/Services/UpdateChecker.swift
+      - path: LLMBudgetTracker/Services/NetworkMonitor.swift
+      - path: LLMBudgetTracker/ViewModels/UpdateViewModel.swift
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  LLMBudgetTracker:
+    build:
+      targets:
+        LLMBudgetTracker: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - LLMBudgetTrackerTests
