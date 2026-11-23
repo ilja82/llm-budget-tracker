@@ -31,6 +31,31 @@ final class DashboardStatsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(summary.costPer1kTokens), 9, accuracy: accuracy)
     }
 
+    func testPaddedZeroDaysAreNotActiveAndNeverTheMostExpensiveDay() throws {
+        let data = [
+            day("2026-10-01", SpendMetrics(spend: 6, apiRequests: 3)),
+            day("2026-10-02", SpendMetrics()),
+            day("2026-10-03", SpendMetrics(apiRequests: 2)),
+            day("2026-10-04", SpendMetrics()),
+        ]
+
+        let summary = DashboardStats.summary(from: data, range: .thisMonth, now: try fixedNow())
+
+        XCTAssertEqual(summary.activeDays, 2)
+        XCTAssertEqual(summary.avgPerActiveDay, 3, accuracy: accuracy)
+        XCTAssertEqual(summary.topDay, DashboardTopDay(date: "2026-10-01", spend: 6))
+    }
+
+    func testRangeWithOnlyZeroDaysHasNoMostExpensiveDay() throws {
+        let data = [day("2026-10-06", SpendMetrics()), day("2026-10-07", SpendMetrics())]
+
+        let summary = DashboardStats.summary(from: data, range: .thisMonth, now: try fixedNow())
+
+        XCTAssertEqual(summary.activeDays, 0)
+        XCTAssertEqual(summary.avgPerActiveDay, 0)
+        XCTAssertNil(summary.topDay)
+    }
+
     func testFailureRateIsZeroWithoutRequests() throws {
         let summary = DashboardStats.summary(
             from: [day("2026-10-01", SpendMetrics(spend: 1, totalTokens: 10))],

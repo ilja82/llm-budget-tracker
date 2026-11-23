@@ -50,7 +50,8 @@ struct TemporaryBudgetIncrease: Equatable, Sendable {
         )
     }
 
-    /// Parses `YYYY-MM-DD` or `YYYY-MM-DDThh:mm:ss[.fraction][Z|±hh:mm]`. No zone means UTC.
+    /// Parses `YYYY-MM-DD` or `YYYY-MM-DD hh[:mm[:ss[.fraction]]][Z|±hh[:mm]]` with `T` or a space
+    /// between date and time, like Python's `datetime.fromisoformat` in LiteLLM. No zone means UTC.
     static func parseExpiry(_ text: String) -> Date? {
         let bytes = Array(text.utf8)
         guard bytes.count >= 10,
@@ -79,14 +80,26 @@ struct TemporaryBudgetIncrease: Equatable, Sendable {
         let offsetSeconds: Int
     }
 
+    private static let colon = UInt8(ascii: ":")
+    private static let separators: Set<UInt8> = [UInt8(ascii: "T"), UInt8(ascii: "t"), UInt8(ascii: " ")]
+
     private static func parseTime(_ bytes: [UInt8]) -> ParsedTime? {
-        guard bytes.count >= 19, bytes[10] == UInt8(ascii: "T"),
-              let hour = number(bytes, at: 11, length: 2), bytes[13] == UInt8(ascii: ":"),
-              let minute = number(bytes, at: 14, length: 2), bytes[16] == UInt8(ascii: ":"),
-              let second = number(bytes, at: 17, length: 2) else { return nil }
-        var index = 19
+        guard separators.contains(bytes[10]), let hour = number(bytes, at: 11, length: 2) else { return nil }
+        var index = 13
+        var minute = 0
+        var second = 0
+        var hasSeconds = false
+        if let value = colonNumber(bytes, at: index) {
+            minute = value
+            index += 3
+            if let value = colonNumber(bytes, at: index) {
+                second = value
+                hasSeconds = true
+                index += 3
+            }
+        }
         var fraction = 0.0
-        if index < bytes.count, bytes[index] == UInt8(ascii: ".") {
+        if hasSeconds, index < bytes.count, bytes[index] == UInt8(ascii: ".") {
             let start = index + 1
             index = start
             var scale = 0.1
@@ -103,22 +116,36 @@ struct TemporaryBudgetIncrease: Equatable, Sendable {
                 index += 1
             } else {
                 guard let offset = parseOffset(bytes, at: index) else { return nil }
-                offsetSeconds = offset
-                index += 6
+                offsetSeconds = offset.seconds
+                index += offset.length
             }
         }
         guard index == bytes.count else { return nil }
         return ParsedTime(hour: hour, minute: minute, second: second, fraction: fraction, offsetSeconds: offsetSeconds)
     }
 
-    private static func parseOffset(_ bytes: [UInt8], at index: Int) -> Int? {
+    private static func colonNumber(_ bytes: [UInt8], at index: Int) -> Int? {
+        guard index < bytes.count, bytes[index] == colon else { return nil }
+        return number(bytes, at: index + 1, length: 2)
+    }
+
+    /// Reads `+hh:mm`, `+hhmm` or `+hh` (also with `-`).
+    private static func parseOffset(_ bytes: [UInt8], at index: Int) -> (seconds: Int, length: Int)? {
         let sign = bytes[index]
-        guard sign == UInt8(ascii: "+") || sign == UInt8(ascii: "-"), bytes.count >= index + 6,
-              let hours = number(bytes, at: index + 1, length: 2), bytes[index + 3] == UInt8(ascii: ":"),
-              let minutes = number(bytes, at: index + 4, length: 2),
-              (0...23).contains(hours), (0...59).contains(minutes) else { return nil }
+        guard sign == UInt8(ascii: "+") || sign == UInt8(ascii: "-"),
+              let hours = number(bytes, at: index + 1, length: 2) else { return nil }
+        var minutes = 0
+        var length = 3
+        if let value = colonNumber(bytes, at: index + 3) {
+            minutes = value
+            length = 6
+        } else if let value = number(bytes, at: index + 3, length: 2) {
+            minutes = value
+            length = 5
+        }
+        guard (0...23).contains(hours), (0...59).contains(minutes) else { return nil }
         let seconds = hours * 3_600 + minutes * 60
-        return sign == UInt8(ascii: "-") ? -seconds : seconds
+        return (sign == UInt8(ascii: "-") ? -seconds : seconds, length)
     }
 
     private static func number(_ bytes: [UInt8], at start: Int, length: Int) -> Int? {

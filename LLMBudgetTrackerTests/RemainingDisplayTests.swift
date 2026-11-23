@@ -21,8 +21,30 @@ final class RemainingDisplayTests: XCTestCase {
         XCTAssertEqual(info(spend: 40, max: 100).usageText(.percentage), "40%")
     }
 
-    func testDollarTextIgnoresRemaining() {
-        XCTAssertEqual(info(spend: 40, max: 100).usageText(.dollar, showRemaining: true), "$40.00")
+    func testDollarTextShowsRemainingWhenOn() {
+        XCTAssertEqual(info(spend: 40, max: 100).usageText(.dollar, showRemaining: true), "$60.00")
+        XCTAssertEqual(info(spend: 120, max: 100).usageText(.dollar, showRemaining: true), "$0.00")
+        XCTAssertEqual(info(spend: 40, max: 100).usageText(.dollar, showRemaining: false), "$40.00")
+    }
+
+    func testTextWithoutBudgetLimitShowsSpend() {
+        XCTAssertEqual(info(spend: 40, max: nil).usageText(.dollar, showRemaining: true), "$40.00")
+        XCTAssertEqual(info(spend: 40, max: nil).usageText(.percentage, showRemaining: true), "$40.00")
+        XCTAssertFalse(info(spend: 40, max: nil).showsRemaining(true))
+    }
+
+    func testPopoverShowsOppositeOfMenuBar() {
+        let limited = info(spend: 40, max: 100)
+        XCTAssertTrue(limited.showsRemaining(true))
+        XCTAssertFalse(limited.popoverShowsRemaining(menuShowsRemaining: true))
+        XCTAssertFalse(limited.showsRemaining(false))
+        XCTAssertTrue(limited.popoverShowsRemaining(menuShowsRemaining: false))
+    }
+
+    func testPopoverShowsSpendWithoutBudgetLimit() {
+        for on in [true, false] {
+            XCTAssertFalse(info(spend: 40, max: nil).popoverShowsRemaining(menuShowsRemaining: on))
+        }
     }
 
     func testFillFractionOn() {

@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct DailyCostDetailView: View {
-    static let windowID = "daily-cost-details"
-
     enum Page: String, CaseIterable, Identifiable {
         case dailyCosts
         case statistics

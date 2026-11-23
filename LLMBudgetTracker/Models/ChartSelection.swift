@@ -37,7 +37,8 @@ enum ModelRange: String, CaseIterable, Codable, Identifiable {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
         calendar.firstWeekday = 2 // Monday, regardless of the user's locale.
-        let today = dailyActivityEndDate(now: now, localTimeZone: localTimeZone)
+        let today = localCalendarDay(now: now, localTimeZone: localTimeZone)
+        let newestDay = dailyActivityEndDate(now: now, localTimeZone: localTimeZone)
         let start: Date?
         let end: Date?
         switch self {
@@ -46,8 +47,8 @@ enum ModelRange: String, CaseIterable, Codable, Identifiable {
             start = interval?.start
             end = interval?.end
         case .last28:
-            start = calendar.date(byAdding: .day, value: -27, to: today)
-            end = calendar.date(byAdding: .day, value: 1, to: today)
+            start = calendar.date(byAdding: .day, value: -27, to: newestDay)
+            end = calendar.date(byAdding: .day, value: 1, to: newestDay)
         case .thisWeek:
             let interval = calendar.dateInterval(of: .weekOfYear, for: today)
             start = interval?.start

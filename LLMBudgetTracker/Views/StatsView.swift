@@ -26,7 +26,7 @@ struct StatsView: View {
             case .rateLimited:
                 if let info = viewModel.budgetInfo {
                     VStack(alignment: .leading, spacing: 10) {
-                        BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
+                        budgetCard(info)
                         errorCard(
                             title: "Requests paused",
                             message: viewModel.errorMessage ??
@@ -49,7 +49,7 @@ struct StatsView: View {
             case .offline:
                 if let info = viewModel.budgetInfo {
                     VStack(alignment: .leading, spacing: 10) {
-                        BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
+                        budgetCard(info)
                         offlineCard
                     }
                 } else {
@@ -67,11 +67,20 @@ struct StatsView: View {
                 )
             case .loaded, .refreshing, .noBudget:
                 if let info = viewModel.budgetInfo {
-                    BudgetCard(info: info, pacing: viewModel.pacingInfo, teamBudget: viewModel.teamBudget)
+                    budgetCard(info)
                 }
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.appState)
+    }
+
+    private func budgetCard(_ info: BudgetInfo) -> some View {
+        BudgetCard(
+            info: info,
+            pacing: viewModel.pacingInfo,
+            teamBudget: viewModel.teamBudget,
+            showsRemaining: info.popoverShowsRemaining(menuShowsRemaining: viewModel.showRemaining)
+        )
     }
 
     private var offlineCard: some View {
@@ -119,6 +128,7 @@ struct BudgetCard: View {
     let info: BudgetInfo
     let pacing: PacingInfo?
     var teamBudget: BudgetInfo?
+    var showsRemaining = true
 
     private var statusColor: Color {
         pacing?.status.color ?? fallbackStatusColor
@@ -168,11 +178,11 @@ struct BudgetCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(info.hasBudgetLimit ? "Remaining" : "Spent")
+                        Text(showsRemaining && info.hasBudgetLimit ? "Remaining" : "Spent")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
 
-                        if let remaining = remainingBudget {
+                        if showsRemaining, let remaining = remainingBudget {
                             Text(currency(remaining))
                                 .font(.system(size: 42, weight: .heavy, design: .rounded))
                                 .foregroundStyle(statusColor)
@@ -180,7 +190,7 @@ struct BudgetCard: View {
                         } else {
                             Text(currency(info.spend))
                                 .font(.system(size: 42, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(info.hasBudgetLimit ? statusColor : .primary)
                                 .accessibilityLabel(String(format: "Spent so far: $%.2f", info.spend))
                         }
 

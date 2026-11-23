@@ -94,10 +94,32 @@ final class ModelRangeTests: XCTestCase {
         )
     }
 
-    func testThisWeekKeepsUTCDayWestOfUTC() throws {
+    func testWeekFollowsLocalDateWestOfUTC() throws {
         XCTAssertEqual(
             try dates(.thisWeek, at: "2026-10-12T03:00:00Z", zone: "America/Los_Angeles"),
+            "2026-10-05"..<"2026-10-12"
+        )
+        XCTAssertEqual(
+            try dates(.lastWeek, at: "2026-10-12T03:00:00Z", zone: "America/Los_Angeles"),
+            "2026-09-28"..<"2026-10-05"
+        )
+        XCTAssertEqual(
+            try dates(.thisWeek, at: "2026-10-12T07:00:00Z", zone: "America/Los_Angeles"),
             "2026-10-12"..<"2026-10-19"
+        )
+    }
+
+    func testMonthFollowsLocalDateWestOfUTC() throws {
+        XCTAssertEqual(
+            try dates(.thisMonth, at: "2026-12-01T01:00:00Z", zone: "America/Los_Angeles"),
+            "2026-11-01"..<"2026-12-01"
+        )
+    }
+
+    func testLast28KeepsTheNewestUTCDayWestOfUTC() throws {
+        XCTAssertEqual(
+            try dates(.last28, at: "2026-10-12T03:00:00Z", zone: "America/Los_Angeles"),
+            "2026-09-15"..<"2026-10-13"
         )
     }
 

@@ -5,8 +5,8 @@ actor APIService {
         static let apiKeyHeaderField: String = "x-litellm-api-key"
         static let requestTimeoutSeconds: TimeInterval = 15
         static let resourceTimeoutSeconds: TimeInterval = 30
-        static let defaultPage: String = "1"
-        static let defaultPageSize: String = "32"
+        static let dailyActivityPageSize = 1000
+        static let dailyActivityMaxPages = 20
     }
 
     // DateFormatter is not thread-safe: keep as actor-isolated instance property
@@ -93,7 +93,9 @@ actor APIService {
             unavailable = sources.unavailable
         }
 
-        let userResult = try await userBudgetResult(baseURL: baseURL, apiKey: apiKey)
+        let userResult = try await userBudgetResult(
+            baseURL: baseURL, apiKey: apiKey, toleratesTransportErrors: teamId != nil
+        )
         let userCandidate = try? userResult.get()
         if teamId == nil, let userCandidate, userCandidate.info.hasBudgetLimit {
             personal.append(userCandidate)
@@ -191,21 +193,28 @@ actor APIService {
             throw APIError.invalidURL
         }
         let fmt = dailyFmt
-        components.queryItems = [
-            URLQueryItem(name: "user_id", value: userId),
-            URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),
-            URLQueryItem(name: "end_date", value: fmt.string(from: endDate)),
-            URLQueryItem(name: "page", value: Constants.defaultPage),
-            URLQueryItem(name: "page_size", value: Constants.defaultPageSize)
-        ]
-        guard let requestURL = components.url else { throw APIError.invalidURL }
-        let request = authenticatedRequest(url: requestURL, apiKey: apiKey)
-        let (data, response) = try await session.data(for: request)
-        let statusCode = (response as? HTTPURLResponse)?.statusCode
-        try validate(response)
-        let rawJSON = sanitizedLogBody(from: data)
-        let daily = try decoder.decode(DailyActivityResponse.self, from: data)
-        return (daily.results, rawJSON, statusCode)
+        var results: [DailySpendData] = []
+        var bodies: [String] = []
+        var statusCode: Int?
+        for page in 1...Constants.dailyActivityMaxPages {
+            components.queryItems = [
+                URLQueryItem(name: "user_id", value: userId),
+                URLQueryItem(name: "start_date", value: fmt.string(from: startDate)),
+                URLQueryItem(name: "end_date", value: fmt.string(from: endDate)),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "page_size", value: String(Constants.dailyActivityPageSize))
+            ]
+            guard let requestURL = components.url else { throw APIError.invalidURL }
+            let request = authenticatedRequest(url: requestURL, apiKey: apiKey)
+            let (data, response) = try await session.data(for: request)
+            statusCode = (response as? HTTPURLResponse)?.statusCode
+            try validate(response)
+            bodies.append(sanitizedLogBody(from: data))
+            let daily = try decoder.decode(DailyActivityResponse.self, from: data)
+            results += daily.results
+            if !daily.hasMore { break }
+        }
+        return (DailySpendData.combinedByDate(results), bodies.joined(separator: "\n"), statusCode)
     }
 
     // MARK: - Helpers
@@ -267,13 +276,18 @@ actor APIService {
         )
     }
 
-    private func userBudgetResult(baseURL: String, apiKey: String) async throws -> Result<BudgetCandidate, Error> {
+    /// For team keys the user level is no budget candidate, so a timeout there must not fail the refresh.
+    private func userBudgetResult(
+        baseURL: String, apiKey: String, toleratesTransportErrors: Bool
+    ) async throws -> Result<BudgetCandidate, Error> {
         do {
             let (info, json, status) = try await fetchBudgetInfo(baseURL: baseURL, apiKey: apiKey)
             return .success(BudgetCandidate(endpoint: "/v2/user/info", info: info, rawJSON: json, statusCode: status))
         } catch let error as APIError {
             return .failure(error)
         } catch let error as DecodingError {
+            return .failure(error)
+        } catch let error as URLError where toleratesTransportErrors && error.code != .cancelled {
             return .failure(error)
         }
     }

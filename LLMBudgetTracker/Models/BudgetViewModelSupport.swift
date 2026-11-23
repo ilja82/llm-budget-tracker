@@ -5,12 +5,6 @@ enum DiagnosticLoggingMode {
     case full
 }
 
-struct CachedActivityEnvelope: Codable {
-    static let currentVersion = 3
-    let version: Int
-    let items: [DailySpendData]
-}
-
 // MARK: - Model-group helpers
 
 @MainActor

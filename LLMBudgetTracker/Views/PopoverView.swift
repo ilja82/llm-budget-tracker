@@ -2,10 +2,10 @@ import SwiftUI
 
 struct PopoverView: View {
     var closePopover: () -> Void = {}
+    var openDashboard: () -> Void = {}
     @Environment(BudgetViewModel.self) private var viewModel
     @Environment(UpdateViewModel.self) private var updateViewModel
     @Environment(\.openSettings) private var openSettings
-    @Environment(\.openWindow) private var openWindow
 
     @State private var isRefreshing = false
     @State private var refreshError: String?
@@ -94,8 +94,7 @@ struct PopoverView: View {
             Spacer()
             Button {
                 closePopover()
-                NSApp.activate(ignoringOtherApps: true)
-                Task { @MainActor in openWindow(id: DailyCostDetailView.windowID) }
+                openDashboard()
             } label: {
                 headerButtonLabel("Details", systemImage: "chart.bar.doc.horizontal")
             }

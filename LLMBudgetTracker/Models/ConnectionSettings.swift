@@ -9,6 +9,16 @@ struct ConnectionSettings {
         !proxyURL.isEmpty && (!newAPIKey.isEmpty || apiKeyConfigured)
     }
 
+    /// The Keychain notice matters only while a key is entered.
+    var showsKeychainNotice: Bool {
+        !apiKeyConfigured || !newAPIKey.isEmpty
+    }
+
+    /// The connection fields start collapsed once a proxy URL and an API key are saved.
+    static func startsCollapsed(savedURL: String, apiKeyConfigured: Bool) -> Bool {
+        !savedURL.isEmpty && apiKeyConfigured
+    }
+
     var canSave: Bool {
         isFormFilled && (try? EndpointSecurity.normalizedBaseURLString(from: proxyURL)) != nil
     }
