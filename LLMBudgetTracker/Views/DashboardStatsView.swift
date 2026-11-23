@@ -6,7 +6,7 @@ struct DashboardStatsView: View {
     let summary: DashboardSummary
 
     private enum Layout {
-        static let chartHeight: CGFloat = 180
+        static let chartHeight: CGFloat = 150
         static let topModels = 6
     }
 
@@ -16,7 +16,7 @@ struct DashboardStatsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     kpiGrid
                     chartSection("Daily tokens") { tokensChart }
                     chartSection("Daily requests") { requestsChart }
@@ -176,6 +176,7 @@ struct DashboardStatsView: View {
             DashboardEmptyState(text: "No spend data for this range")
                 .frame(maxWidth: .infinity)
         } else {
+            let maxSpend = weekdays.map(\.spend).max() ?? 0
             Chart(weekdays) { entry in
                 BarMark(x: .value("Weekday", entry.label), y: .value("Spend", entry.spend))
                     .foregroundStyle(Color.accentColor)
@@ -187,7 +188,7 @@ struct DashboardStatsView: View {
                     AxisGridLine()
                     AxisValueLabel {
                         if let val = value.as(Double.self) {
-                            Text(String(format: "$%.0f", val))
+                            Text(DashboardFormat.axisDollars(val, maxValue: maxSpend))
                         }
                     }
                 }
