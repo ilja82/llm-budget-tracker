@@ -6,7 +6,7 @@ final class MenuBarIconStyleTests: XCTestCase {
         let suiteName = "MenuBarIconStyleTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
-        addTeardownBlock { defaults.removePersistentDomain(forName: suiteName) }
+        addTeardownBlock { UserDefaults().removePersistentDomain(forName: suiteName) }
         return defaults
     }
 
