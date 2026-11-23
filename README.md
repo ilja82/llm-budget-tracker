@@ -19,11 +19,11 @@ LiteLLM proxy and displays daily activity charts.
   </tr>
 </table>
 
-<details>
-<summary>Dashboard window</summary>
-<br>
-<img src="docs/Screenshot_4.png" alt="Dashboard window with spend statistics, daily tokens, daily requests, spend share by model and spend by weekday" width="600">
-</details>
+<p>
+  <img src="docs/Screenshot_4.png" alt="Dashboard window with spend statistics, daily tokens, daily requests, spend share by model and spend by weekday" width="600">
+  <br>
+  Dashboard window
+</p>
 
 ## What it does
 

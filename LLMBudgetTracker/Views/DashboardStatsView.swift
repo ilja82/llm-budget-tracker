@@ -31,7 +31,7 @@ struct DashboardStatsView: View {
     // MARK: - KPI tiles
 
     private var kpiGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10, alignment: .top)], spacing: 10) {
             KPITile(title: "Total spend", value: DashboardFormat.dollars(summary.totalSpend))
             KPITile(
                 title: "Avg per active day",
