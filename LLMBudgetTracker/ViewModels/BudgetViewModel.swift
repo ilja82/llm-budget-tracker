@@ -241,12 +241,7 @@ final class BudgetViewModel {
     @ObservationIgnored private var _dailySpend: [(date: Date, amount: Double)]?
     @ObservationIgnored private var _safeSpendLine: [(date: Date, amount: Double)]?
 
-    private static let dailyFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
-    }()
+    private static let dailyFmt = DayKeyFormatter.make()
     private static let refetchGraceDays = 2
     private static let iso8601Display = ISO8601DateFormatter()
 

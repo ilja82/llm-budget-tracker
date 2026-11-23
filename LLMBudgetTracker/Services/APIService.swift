@@ -10,12 +10,7 @@ actor APIService {
     }
 
     // DateFormatter is not thread-safe: keep as actor-isolated instance property
-    private let dailyFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
-    }()
+    private let dailyFmt = DayKeyFormatter.make()
 
     // ISO8601DateFormatter is documented as thread-safe; used from non-isolated
     // dateDecodingStrategy closure so marked nonisolated(unsafe)
@@ -85,11 +80,13 @@ actor APIService {
         let teamId = keyInfo.teamId.flatMap { $0.isEmpty ? nil : $0 }
         var personal = keyCandidates(keyInfo)
         var team: BudgetCandidate?
+        var memberSpend: BudgetCandidate?
         var unavailable: [String] = []
         if let teamId {
             let sources = try await teamCandidates(baseURL: baseURL, apiKey: apiKey, teamId: teamId)
             personal += [sources.member].compactMap { $0 }
             team = sources.team
+            memberSpend = sources.memberSpend
             unavailable = sources.unavailable
         }
 
@@ -101,6 +98,9 @@ actor APIService {
             personal.append(userCandidate)
         }
 
+        if teamId != nil, let failure = userResult.failureText {
+            unavailable.append("/v2/user/info: unavailable (\(failure))")
+        }
         let summary = ((personal + [team].compactMap { $0 }).map(\.summary) + unavailable).joined(separator: ", ")
         let mostLimited = personal.min(by: { $0.info.remainingBudget < $1.info.remainingBudget })
         if let chosen = mostLimited ?? team {
@@ -114,7 +114,14 @@ actor APIService {
                 endpoint: chosen.endpoint, keyInfo: keyInfo, limitSources: summary, teamBudget: teamBudget
             )
         }
-        let user = try userResult.get()
+        let user: BudgetCandidate
+        switch userResult {
+        case .success(let candidate):
+            user = candidate
+        case .failure(let error):
+            guard error is URLError, let memberSpend else { throw error }
+            user = memberSpend
+        }
         return BudgetFetchResult(
             info: teamId == nil ? user.info : user.info.withoutBudgetLimit(),
             rawJSON: user.rawJSON, statusCode: user.statusCode,
@@ -151,7 +158,10 @@ actor APIService {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
         }
-        components.queryItems = [URLQueryItem(name: "team_id", value: teamId)]
+        components.queryItems = [
+            URLQueryItem(name: "team_id", value: teamId),
+            URLQueryItem(name: "include_members", value: "false")
+        ]
         guard let requestURL = components.url else { throw APIError.invalidURL }
         let request = authenticatedRequest(url: requestURL, apiKey: apiKey)
         let (data, response) = try await session.data(for: request)
@@ -256,7 +266,14 @@ actor APIService {
                 endpoint: "/team/info", info: details.toBudgetInfo(), rawJSON: json, statusCode: status
             )
         }
-        return TeamSources(member: memberCandidate, team: teamCandidate, unavailable: unavailable)
+        let memberSpend = member.map { info, json, status in
+            BudgetCandidate(
+                endpoint: memberEndpoint, info: info.withoutBudgetLimit(), rawJSON: json, statusCode: status
+            )
+        }
+        return TeamSources(
+            member: memberCandidate, memberSpend: memberSpend, team: teamCandidate, unavailable: unavailable
+        )
     }
 
     /// The member's own limit, else the team's default member budget plus the member's active
@@ -292,14 +309,16 @@ actor APIService {
         }
     }
 
-    /// Runs a budget source lookup. HTTP and decoding failures mean "source unavailable"
-    /// and yield a failure; transport errors and cancellation propagate.
+    /// Runs a team budget source lookup. HTTP, decoding and transport failures mean "source unavailable"
+    /// and yield a failure; cancellation propagates.
     private func bestEffort<T>(_ operation: () async throws -> T) async throws -> Result<T, Error> {
         do {
             return .success(try await operation())
         } catch let error as APIError {
             return .failure(error)
         } catch let error as DecodingError {
+            return .failure(error)
+        } catch let error as URLError where error.code != .cancelled {
             return .failure(error)
         }
     }
@@ -350,13 +369,16 @@ private extension Result where Failure == Error {
     var failureText: String? {
         guard case .failure(let error) = self else { return nil }
         if let apiError = error as? APIError { return apiError.errorDescription }
+        if let urlError = error as? URLError { return urlError.localizedDescription }
         return "invalid response"
     }
 }
 
-/// The team member and team budgets of a team key, plus a log entry for each source that failed.
+/// The team member and team budgets of a team key, the member spend without a limit, and a log entry for each
+/// source that failed.
 private struct TeamSources {
     let member: BudgetCandidate?
+    let memberSpend: BudgetCandidate?
     let team: BudgetCandidate?
     let unavailable: [String]
 }
