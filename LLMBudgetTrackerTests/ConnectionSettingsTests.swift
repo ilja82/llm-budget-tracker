@@ -94,6 +94,22 @@ final class ConnectionSettingsTests: XCTestCase {
         }
     }
 
+    func testConnectionStartsCollapsedOnlyWhenURLAndKeyAreSaved() {
+        XCTAssertTrue(ConnectionSettings.startsCollapsed(savedURL: "https://proxy.example.com", apiKeyConfigured: true))
+        XCTAssertFalse(ConnectionSettings.startsCollapsed(savedURL: "", apiKeyConfigured: true))
+        XCTAssertFalse(ConnectionSettings.startsCollapsed(savedURL: "https://proxy.example.com", apiKeyConfigured: false))
+    }
+
+    func testKeychainNoticeShowsOnlyWhileAKeyIsEntered() {
+        let saved = ConnectionSettings(proxyURL: "https://proxy.example.com", newAPIKey: "", apiKeyConfigured: true)
+        let replacing = ConnectionSettings(proxyURL: "https://proxy.example.com", newAPIKey: "new", apiKeyConfigured: true)
+        let firstSetup = ConnectionSettings(proxyURL: "", newAPIKey: "", apiKeyConfigured: false)
+
+        XCTAssertFalse(saved.showsKeychainNotice)
+        XCTAssertTrue(replacing.showsKeychainNotice)
+        XCTAssertTrue(firstSetup.showsKeychainNotice)
+    }
+
     private func makeSettings(
         proxyURL: String = "https://new-proxy.example.com",
         newAPIKey: String = "",

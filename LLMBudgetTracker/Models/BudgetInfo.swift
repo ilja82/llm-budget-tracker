@@ -58,7 +58,17 @@ struct BudgetInfo: Codable {
             let share = showRemaining ? max(maxBudget - spend, 0) / maxBudget : spend / maxBudget
             return String(format: "%.0f%%", share * 100)
         }
-        return String(format: "$%.2f", spend)
+        return String(format: "$%.2f", showsRemaining(showRemaining) ? remainingBudget : spend)
+    }
+
+    /// Whether the menu bar shows the remaining budget; it needs a budget limit.
+    func showsRemaining(_ showRemaining: Bool) -> Bool {
+        showRemaining && hasBudgetLimit
+    }
+
+    /// Whether the popover headline shows the remaining budget: the opposite of the menu bar.
+    func popoverShowsRemaining(menuShowsRemaining showRemaining: Bool) -> Bool {
+        hasBudgetLimit && !showRemaining
     }
 
     func fillFraction(showRemaining: Bool) -> Double {

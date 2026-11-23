@@ -6,10 +6,11 @@ enum RefreshBackoff {
     static let longDelaySeconds = 3600
     static let longDelayThreshold = 8
 
-    static func delaySeconds(consecutiveFailures: Int) -> Int {
-        guard consecutiveFailures <= longDelayThreshold else { return longDelaySeconds }
+    static func delaySeconds(consecutiveFailures: Int, intervalSeconds: Int = longDelaySeconds) -> Int {
+        let ceiling = max(baseSeconds, min(intervalSeconds, longDelaySeconds))
+        guard consecutiveFailures <= longDelayThreshold else { return ceiling }
         let exponent = max(consecutiveFailures - 1, 0)
         let doubled = baseSeconds << min(exponent, 8)
-        return min(doubled, maxShortSeconds)
+        return min(doubled, maxShortSeconds, ceiling)
     }
 }

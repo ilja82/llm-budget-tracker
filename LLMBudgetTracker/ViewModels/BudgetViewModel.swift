@@ -155,7 +155,7 @@ final class BudgetViewModel {
 
     var currentPeriodStart: Date? {
         guard let info = budgetInfo, let resetAt = info.budgetResetAt,
-              let dur = info.budgetDuration, let days = parseDurationDays(dur) else { return nil }
+              let dur = info.budgetDuration, let days = BudgetDuration.days(dur) else { return nil }
         var utcCal = Calendar(identifier: .gregorian)
         utcCal.timeZone = TimeZone(identifier: "UTC") ?? .current
         guard let utcStart = utcCal.date(byAdding: .day, value: -days, to: resetAt) else { return nil }
@@ -557,7 +557,7 @@ final class BudgetViewModel {
         }
         let fmt = Self.dailyFmt
         let today = dailyActivityEndDate(now: Date())
-        let cache = loadCachedActivity()
+        let cache = loadCachedActivity(forUser: info.userId)
 
         let startDate = Self.computeFetchStartDate(today: today, cache: cache)
 
@@ -566,7 +566,7 @@ final class BudgetViewModel {
             "start_date": fmt.string(from: startDate),
             "end_date": fmt.string(from: today),
             "page": "1",
-            "page_size": "32"
+            "page_size": "1000"
         ]
         do {
             let (fetched, rawJSON, statusCode) = try await withRetry {
@@ -579,7 +579,9 @@ final class BudgetViewModel {
                 )
             }
 
-            let result = mergeAndPersistActivity(cache: cache, fetched: fetched, startDate: startDate, today: today)
+            let result = mergeAndPersistActivity(
+                cache: cache, fetched: fetched, startDate: startDate, today: today, userId: info.userId
+            )
             dailyActivity = result
             spendLogs = result.compactMap { $0.toSpendLog() }
 
@@ -620,7 +622,7 @@ final class BudgetViewModel {
         return max(grace, floor)
     }
 
-    private func loadCachedActivity() -> [DailySpendData] {
+    private func loadCachedActivity(forUser userId: String? = nil) -> [DailySpendData] {
         let data: Data?
         do {
             data = try EncryptedStore.data(forKey: StorageKeys.App.dailyActivityCache)
@@ -633,18 +635,18 @@ final class BudgetViewModel {
         }
         guard let data else { return [] }
         if let envelope = try? JSONDecoder().decode(CachedActivityEnvelope.self, from: data) {
-            guard envelope.version == CachedActivityEnvelope.currentVersion else {
+            guard let items = envelope.items(forUser: userId) else {
                 EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
                 return []
             }
-            return envelope.items
+            return items
         }
         EncryptedStore.remove(forKey: StorageKeys.App.dailyActivityCache)
         return []
     }
 
-    private func saveCachedActivity(_ items: [DailySpendData]) {
-        let envelope = CachedActivityEnvelope(version: CachedActivityEnvelope.currentVersion, items: items)
+    private func saveCachedActivity(_ items: [DailySpendData], userId: String) {
+        let envelope = CachedActivityEnvelope(userId: userId, items: items)
         do {
             let encoded = try JSONEncoder().encode(envelope)
             try EncryptedStore.set(encoded, forKey: StorageKeys.App.dailyActivityCache)
@@ -657,7 +659,8 @@ final class BudgetViewModel {
         cache: [DailySpendData],
         fetched: [DailySpendData],
         startDate: Date,
-        today: Date
+        today: Date,
+        userId: String
     ) -> [DailySpendData] {
         var merged: [String: DailySpendData] = [:]
         for entry in cache where !entry.date.isEmpty { merged[entry.date] = entry }
@@ -684,7 +687,7 @@ final class BudgetViewModel {
         let result = merged.values
             .filter { $0.date >= cutoffStr }
             .sorted { $0.date < $1.date }
-        saveCachedActivity(result)
+        saveCachedActivity(result, userId: userId)
         return result
     }
 
@@ -698,7 +701,7 @@ final class BudgetViewModel {
         guard let maxBudget = info.maxBudget, maxBudget > 0,
               let resetAt = info.budgetResetAt,
               let durationStr = info.budgetDuration,
-              let totalDays = parseDurationDays(durationStr) else {
+              let totalDays = BudgetDuration.days(durationStr) else {
             pacingInfo = nil
             return
         }
@@ -755,24 +758,6 @@ final class BudgetViewModel {
             fields.append(.init(name: "models", value: models))
         }
         return fields
-    }
-
-    /// Parses "30d", "24h", "1m" into a finite number of days.
-    /// Returns nil for indefinite periods so callers can avoid open-ended loops.
-    private func parseDurationDays(_ duration: String) -> Int? {
-        let s = duration.lowercased()
-        if s.contains("indefinite") || s == "none" || s == "never" {
-            return nil
-        }
-        if s == "daily" { return 1 }
-        if s == "weekly" { return 7 }
-        if s == "monthly" { return 30 }
-        if s.hasSuffix("d"), let num = Int(s.dropLast()) { return max(num, 1) }
-        if s.hasSuffix("s"), let num = Int(s.dropLast()) { return max(1, Int(ceil(Double(num) / 86_400.0))) }
-        if s.hasSuffix("h"), let num = Int(s.dropLast()) { return max(1, Int(ceil(Double(num) / 24.0))) }
-        if s.hasSuffix("m"), let num = Int(s.dropLast()) { return max(1, Int(ceil(Double(num) / 1_440.0))) }
-        if s.hasSuffix("mo"), let num = Int(s.dropLast(2)) { return max(1, num * 30) }
-        return 30
     }
 
     /// Shows `.offline` unless a more important state is visible (setter is file-private here).

@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var devModeUnlocked = UserDefaults.standard.bool(forKey: StorageKeys.DevMode.unlocked)
     @State private var showDevModeSheet = false
     @State private var apiKeyConfigured = false
+    @State private var isConnectionExpanded = true
 
     private let refreshOptions = [5, 15, 30, 60, 120]
     private let diagnosticsEnabledForBuild: Bool = {
@@ -26,23 +27,24 @@ struct SettingsView: View {
         @Bindable var vm = viewModel
         Form {
             connectionSection
-            startupSection
-            updatesSection
-            usageDataSection
+            generalSection(vm: $vm)
             displaySection(vm: $vm)
-            refreshSection(vm: $vm)
             if diagnosticsEnabledForBuild && devModeUnlocked {
                 advancedSection
             }
             versionFooter
         }
         .formStyle(.grouped)
+        .background(InitialFocusClearer())
         .frame(minWidth: 500, idealWidth: 500, maxWidth: 500)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             proxyURL = viewModel.endpointURL
             autoStart = AutoStartService.isEnabled
             apiKeyConfigured = viewModel.devMode.isEnabled ? false : KeychainService.isConfigured
+            isConnectionExpanded = !ConnectionSettings.startsCollapsed(
+                savedURL: viewModel.endpointURL, apiKeyConfigured: apiKeyConfigured
+            )
         }
         .onChange(of: viewModel.devMode.isEnabled) { _, _ in
             apiKeyConfigured = viewModel.devMode.isEnabled ? false : KeychainService.isConfigured
@@ -57,34 +59,53 @@ struct SettingsView: View {
 
     private var connectionSection: some View {
         Section {
-            TextField("URL", text: $proxyURL, prompt: Text("https://your-litellm-proxy.com"))
-                .textFieldStyle(.roundedBorder)
-                .onChange(of: proxyURL) { _, _ in
-                    connectionStatus = .idle
-                }
+            DisclosureGroup(isExpanded: $isConnectionExpanded) {
+                connectionFields
+            } label: {
+                LabeledContent("Proxy", value: connectionSummary)
+            }
+            connectionStatusView
+        } header: {
+            Text("Connection")
+        }
+    }
 
-            if let validationMessage = proxyURLValidationMessage {
-                Text(validationMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+    private var connectionSummary: String {
+        guard !viewModel.endpointURL.isEmpty else { return "Not configured" }
+        return URL(string: viewModel.endpointURL)?.host() ?? viewModel.endpointURL
+    }
+
+    @ViewBuilder
+    private var connectionFields: some View {
+        TextField("URL", text: $proxyURL, prompt: Text("https://your-litellm-proxy.com"))
+            .textFieldStyle(.roundedBorder)
+            .onChange(of: proxyURL) { _, _ in
+                connectionStatus = .idle
             }
 
-            SecureField(
-                "API key",
-                text: $newAPIKey,
-                prompt: Text(apiKeyConfigured ? "Enter new key to replace existing" : "Paste your API key")
-            )
-                .textFieldStyle(.roundedBorder)
-                .onChange(of: newAPIKey) { _, _ in
-                    connectionStatus = .idle
-                }
+        if let validationMessage = proxyURLValidationMessage {
+            Text(validationMessage)
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
 
-            if apiKeyConfigured {
-                Text("Leave the API key empty to keep using the saved key.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        SecureField(
+            "API key",
+            text: $newAPIKey,
+            prompt: Text(apiKeyConfigured ? "Enter new key to replace existing" : "Paste your API key")
+        )
+            .textFieldStyle(.roundedBorder)
+            .onChange(of: newAPIKey) { _, _ in
+                connectionStatus = .idle
             }
 
+        if apiKeyConfigured {
+            Text("Leave the API key empty to keep using the saved key.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
+        if connectionSettings.showsKeychainNotice {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "lock.fill")
                     .font(.caption)
@@ -99,24 +120,20 @@ struct SettingsView: View {
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        }
 
-            HStack(spacing: 8) {
-                Spacer()
-                Button("Test Connection") {
-                    performConnectionTest()
-                }
-                .disabled(isTesting || !isFormFilled)
-
-                Button("Save") {
-                    saveConnection()
-                }
-                .disabled(isTesting || !canSave)
-                .buttonStyle(.borderedProminent)
+        HStack(spacing: 8) {
+            Spacer()
+            Button("Test Connection") {
+                performConnectionTest()
             }
+            .disabled(isTesting || !isFormFilled)
 
-            connectionStatusView
-        } header: {
-            Text("Connection")
+            Button("Save") {
+                saveConnection()
+            }
+            .disabled(isTesting || !canSave)
+            .buttonStyle(.borderedProminent)
         }
     }
 
@@ -156,7 +173,7 @@ struct SettingsView: View {
                 }
             }
             Toggle("Show remaining instead of used", isOn: vm.showRemaining)
-            Text("Counts percentages and the menu bar fill down from 100%.")
+            Text("The menu bar shows the remaining budget and the popover shows the spent amount.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
@@ -164,25 +181,10 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Refresh Section
+    // MARK: - General Section
 
     @ViewBuilder
-    private func refreshSection(vm: Bindable<BudgetViewModel>) -> some View {
-        Section {
-            Picker("Auto-refresh interval", selection: vm.updateIntervalMinutes) {
-                ForEach(refreshOptions, id: \.self) { minutes in
-                    Text("\(minutes) minutes").tag(minutes)
-                }
-            }
-            .pickerStyle(.menu)
-        } header: {
-            Text("Refresh")
-        }
-    }
-
-    // MARK: - Startup Section
-
-    private var startupSection: some View {
+    private func generalSection(vm: Bindable<BudgetViewModel>) -> some View {
         Section {
             Toggle("Launch at Login", isOn: $autoStart)
                 .onChange(of: autoStart) { _, enabled in
@@ -194,49 +196,31 @@ struct SettingsView: View {
                         autoStart = !enabled
                     }
                 }
-            Text("Starts LLM Budget Tracker automatically so your budget is always visible in the menu bar.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .help("Starts LLM Budget Tracker automatically so your budget is always visible in the menu bar.")
             if let err = autoStartError {
                 Text(err).font(.caption).foregroundStyle(.red)
             }
-        } header: {
-            Text("Startup")
-        }
-    }
-
-    // MARK: - Updates Section
-
-    private var updatesSection: some View {
-        Section {
             Toggle("Check for Updates", isOn: Binding(
                 get: { updateViewModel.isEnabled },
                 set: { updateViewModel.isEnabled = $0 }
             ))
-            Text("Asks GitHub every 12 hours whether a newer version exists and shows a notice in the popup."
-                 + " Nothing is installed automatically.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } header: {
-            Text("Updates")
-        }
-    }
-
-    // MARK: - Usage Data Section
-
-    private var usageDataSection: some View {
-        Section {
+            .help("Asks GitHub every 12 hours whether a newer version exists and shows a notice in the popup."
+                  + " Nothing is installed automatically.")
             Toggle("Show Daily Activity", isOn: Binding(
                 get: { viewModel.dailyActivityEnabled },
                 set: { enabled in
                     Task { await viewModel.setDailyActivityEnabled(enabled) }
                 }
             ))
-            Text("Adds daily charts and activity details to the popup.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .help("Adds daily charts and activity details to the popup.")
+            Picker("Auto-refresh interval", selection: vm.updateIntervalMinutes) {
+                ForEach(refreshOptions, id: \.self) { minutes in
+                    Text("\(minutes) minutes").tag(minutes)
+                }
+            }
+            .pickerStyle(.menu)
         } header: {
-            Text("Usage Data")
+            Text("General")
         }
     }
 
@@ -359,6 +343,7 @@ struct SettingsView: View {
             viewModel.clearDailyActivityData()
             newAPIKey = ""
             apiKeyConfigured = true
+            isConnectionExpanded = false
             connectionStatus = .result("Settings saved", true)
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -378,6 +363,23 @@ struct SettingsView: View {
 }
 
 // MARK: - Supporting Types
+
+/// Opens the window without a focused control, so no focus ring shows until the user presses Tab.
+private struct InitialFocusClearer: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { ClearingView() }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class ClearingView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            DispatchQueue.main.async { [weak window] in
+                window?.makeFirstResponder(nil)
+            }
+        }
+    }
+}
 
 private enum ConnectionStatus {
     case idle
