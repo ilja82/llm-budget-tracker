@@ -6,6 +6,8 @@ LiteLLM proxy and displays daily activity charts.
 ![macOS 27+](https://img.shields.io/badge/macOS-27%2B-blue)
 ![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)
 
+<img src="docs/Screenshot_1.png" alt="LLM Budget Tracker popover with remaining budget, daily spend chart and spend per model" width="468">
+
 ## What it does
 
 - Shows current budget usage directly in the macOS status bar.
