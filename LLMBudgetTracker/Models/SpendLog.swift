@@ -190,4 +190,96 @@ struct DailySpendData: Codable {
 
 struct DailyActivityResponse: Codable {
     let results: [DailySpendData]
+    let metadata: DailyActivityPageInfo?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        results = try container.decode([DailySpendData].self, forKey: .results)
+        metadata = try? container.decode(DailyActivityPageInfo.self, forKey: .metadata)
+    }
+
+    enum CodingKeys: String, CodingKey { case results, metadata }
+
+    var hasMore: Bool { metadata?.hasMore ?? false }
+}
+
+struct DailyActivityPageInfo: Codable {
+    let hasMore: Bool
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasMore = (try? container.decode(Bool.self, forKey: .hasMore)) ?? false
+    }
+
+    enum CodingKeys: String, CodingKey { case hasMore = "has_more" }
+}
+
+extension SpendMetrics {
+    static func + (lhs: Self, rhs: Self) -> Self {
+        Self(
+            spend: lhs.spend + rhs.spend,
+            promptTokens: lhs.promptTokens + rhs.promptTokens,
+            completionTokens: lhs.completionTokens + rhs.completionTokens,
+            cacheReadInputTokens: lhs.cacheReadInputTokens + rhs.cacheReadInputTokens,
+            cacheCreationInputTokens: lhs.cacheCreationInputTokens + rhs.cacheCreationInputTokens,
+            totalTokens: lhs.totalTokens + rhs.totalTokens,
+            successfulRequests: lhs.successfulRequests + rhs.successfulRequests,
+            failedRequests: lhs.failedRequests + rhs.failedRequests,
+            apiRequests: lhs.apiRequests + rhs.apiRequests
+        )
+    }
+}
+
+extension DailySpendData {
+    /// Joins the results of several pages: LiteLLM pages by database row, so one day can be split across pages.
+    static func combinedByDate(_ entries: [Self]) -> [Self] {
+        var order: [String] = []
+        var byDate: [String: Self] = [:]
+        for entry in entries {
+            if let existing = byDate[entry.date] {
+                byDate[entry.date] = existing.adding(entry)
+            } else {
+                order.append(entry.date)
+                byDate[entry.date] = entry
+            }
+        }
+        return order.compactMap { byDate[$0] }
+    }
+
+    private func adding(_ other: Self) -> Self {
+        let combined: DailyBreakdown?
+        switch (breakdown, other.breakdown) {
+        case let (lhs?, rhs?):
+            let add = { (first: ModelGroupBreakdown, second: ModelGroupBreakdown) in
+                ModelGroupBreakdown(metrics: first.metrics + second.metrics)
+            }
+            combined = DailyBreakdown(
+                modelGroups: lhs.modelGroups.merging(rhs.modelGroups, uniquingKeysWith: add),
+                models: lhs.models.merging(rhs.models, uniquingKeysWith: add)
+            )
+        default:
+            combined = breakdown ?? other.breakdown
+        }
+        return Self(date: date, metrics: metrics + other.metrics, breakdown: combined)
+    }
+}
+
+struct CachedActivityEnvelope: Codable {
+    static let currentVersion = 4
+    let version: Int
+    let userId: String?
+    let items: [DailySpendData]
+
+    init(userId: String?, items: [DailySpendData]) {
+        version = Self.currentVersion
+        self.userId = userId
+        self.items = items
+    }
+
+    /// The cached days, or nil for another format or another user. A nil `userId` accepts any user.
+    func items(forUser userId: String?) -> [DailySpendData]? {
+        guard version == Self.currentVersion else { return nil }
+        if let userId, self.userId != userId { return nil }
+        return items
+    }
 }

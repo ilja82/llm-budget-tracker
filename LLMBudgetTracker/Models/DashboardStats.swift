@@ -65,10 +65,11 @@ enum DashboardStats {
         let requests = days.reduce(0) { $0 + $1.metrics.apiRequests }
         let failed = days.reduce(0) { $0 + $1.metrics.failedRequests }
         let tokens = days.reduce(0) { $0 + $1.metrics.totalTokens }
+        let activeDays = days.filter { $0.metrics.spend > 0 || $0.metrics.apiRequests > 0 }.count
         return DashboardSummary(
             totalSpend: totalSpend,
-            avgPerActiveDay: days.isEmpty ? 0 : totalSpend / Double(days.count),
-            activeDays: days.count,
+            avgPerActiveDay: activeDays == 0 ? 0 : totalSpend / Double(activeDays),
+            activeDays: activeDays,
             topDay: topDay(days),
             requests: requests,
             failed: failed,
@@ -132,7 +133,7 @@ enum DashboardStats {
 
     private static func topDay(_ days: [DailySpendData]) -> DashboardTopDay? {
         var best: DailySpendData?
-        for day in days {
+        for day in days where day.metrics.spend > 0 {
             guard let current = best else {
                 best = day
                 continue

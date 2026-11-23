@@ -30,7 +30,10 @@ extension BudgetViewModel {
                 let seconds: Double
                 if self?.isInErrorState == true {
                     consecutiveFailures += 1
-                    seconds = Double(RefreshBackoff.delaySeconds(consecutiveFailures: consecutiveFailures))
+                    seconds = Double(RefreshBackoff.delaySeconds(
+                        consecutiveFailures: consecutiveFailures,
+                        intervalSeconds: (self?.updateIntervalMinutes ?? 60) * 60
+                    ))
                 } else {
                     consecutiveFailures = 0
                     seconds = Double(self?.updateIntervalMinutes ?? 60) * 60

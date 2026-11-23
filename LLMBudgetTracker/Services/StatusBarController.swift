@@ -9,6 +9,7 @@ final class StatusBarController {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
     private weak var hostingViewController: NSViewController?
+    private lazy var dashboardWindow = DashboardWindowController(viewModel: viewModel)
 
     init() {
         setupPopover()
@@ -25,9 +26,10 @@ final class StatusBarController {
         popover.animates = true
         popover.contentSize = NSSize(width: 470, height: 420)
         let controller = NSHostingController(
-            rootView: PopoverView(closePopover: { [weak self] in
-                self?.popover.performClose(nil)
-            })
+            rootView: PopoverView(
+                closePopover: { [weak self] in self?.popover.performClose(nil) },
+                openDashboard: { [weak self] in self?.dashboardWindow.show() }
+            )
             .environment(viewModel)
             .environment(updateViewModel)
         )

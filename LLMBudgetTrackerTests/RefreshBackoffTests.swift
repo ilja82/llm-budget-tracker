@@ -14,6 +14,18 @@ final class RefreshBackoffTests: XCTestCase {
         }
     }
 
+    func testLongDelayNeverExceedsTheRefreshInterval() {
+        XCTAssertEqual(RefreshBackoff.delaySeconds(consecutiveFailures: 9, intervalSeconds: 300), 300)
+        XCTAssertEqual(RefreshBackoff.delaySeconds(consecutiveFailures: 9, intervalSeconds: 900), 900)
+        XCTAssertEqual(RefreshBackoff.delaySeconds(consecutiveFailures: 9, intervalSeconds: 3600), 3600)
+        XCTAssertEqual(RefreshBackoff.delaySeconds(consecutiveFailures: 9, intervalSeconds: 7200), 3600)
+    }
+
+    func testShortDelaysNeverExceedTheRefreshInterval() {
+        XCTAssertEqual(RefreshBackoff.delaySeconds(consecutiveFailures: 4, intervalSeconds: 120), 120)
+        XCTAssertEqual(RefreshBackoff.delaySeconds(consecutiveFailures: 1, intervalSeconds: 0), 30)
+    }
+
     func testDelayIsMonotonicAndBounded() {
         var previous = 0
         for failures in 1...10000 {

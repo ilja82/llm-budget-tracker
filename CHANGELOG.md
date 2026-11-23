@@ -50,10 +50,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   menu bar tooltip lists the increase. After the expiry the base cap is back with the next refresh. Key
   `budget_limits` windows are not raised.
 
+- **Show remaining instead of used:** a new Settings switch makes the menu bar show the remaining budget instead of
+  the used one, in dollars or percent, and fills the menu bar icon from full to empty. The popover headline then
+  shows the spent amount. Without a budget limit, both show the spend.
+- **Menu Bar Icon** picker in Settings: Bar (default), Ring, Dot or Text only.
+- **Exact daily spend on hover:** hovering a bar in the Spend chart shows the spend of that day.
+
 #### Changed
 
+- **Shorter Settings window:** once a connection is saved, the URL and API key fields are hidden behind the "Proxy"
+  row; click it to change them. The Keychain notice appears only while you enter a key. Launch at Login, Check for
+  Updates, Show Daily Activity and the refresh interval are grouped under "General"; their explanations are tooltips.
 - **Slower polling after repeated errors:** after 9 failed refreshes in a row the app polls once per hour instead of
-  every 30 seconds to 5 minutes. The first successful refresh restores the normal interval.
+  every 30 seconds to 5 minutes, but never less often than your refresh interval in Settings. The first successful
+  refresh restores the normal interval.
+- **"This week", "Last week" and "This month" change at your local midnight** in every time zone. West of UTC they no
+  longer jump to an empty week or month in the evening. "Last 28 days" still includes the newest UTC day.
 - **macOS 27 or later is now required.** The app is built for macOS 27; Macs on macOS 26 can keep using v0.0.8.
 - **No budget limit is no longer an error.** Instead of "No budget found", the popover shows your spend so far and
   explains that remaining budget and pacing require a limit. The menu bar tooltip reads "Used: … / No budget limit
@@ -71,6 +83,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ignored.
 - The IPv6 loopback address `http://[::1]` is now accepted as a local proxy URL.
 - Proxy URLs without a host are now rejected.
+- After midnight the app now asks for the new day's activity at once instead of waiting for the UTC date to change.
+- Daily activity was cut off after 32 rows, so with several models only the last days were complete and older days
+  showed $0. The app now loads all rows, and the cached daily activity is loaded again once after the update.
+- Weekly budget durations such as `1w` were treated as 30 days, which gave a wrong pace.
+- For team keys, a timeout of the user lookup no longer fails the whole refresh when the key or team member budget
+  is known.
+- Temporary budget increases with an expiry such as `2026-12-01 10:00` (space instead of `T`, no seconds) are now
+  counted, like LiteLLM does.
+- Daily activity cached for another LiteLLM user is no longer shown after the key changes users.
+- The dashboard "Statistics" page counted days without usage as active days and could show $0 as the most expensive
+  day.
+- The Settings window no longer opens when the app starts, and closing it no longer quits the app.
 
 ### For developers
 
