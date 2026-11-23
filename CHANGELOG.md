@@ -33,8 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The app asks GitHub at most every 12 hours and only announces a release once it is at least 12 hours old. Nothing is
   installed automatically; offline, nothing is shown. Turn it off with **Check for Updates** in Settings.
 - **"This week" and "Last week"** ranges in the per-model spend breakdown. Weeks always run Monday to Sunday,
-  independent of your locale; "Last week" is the previous calendar week. All ranges are based on UTC, like the
-  daily API data.
+  independent of your locale; "Last week" is the previous calendar week.
 - **Budget limits from all levels:** besides the user (`/v2/user/info`) and team-member (`/team/{id}/members/me`)
   budgets, the app now also considers the key's own budget and its `budget_limits` windows (`/key/info`), the team
   budget and the team's default member budget (`/team/info`). If several limits are set, the one with the least
@@ -88,7 +87,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   showed $0. The app now loads all rows, and the cached daily activity is loaded again once after the update.
 - Weekly budget durations such as `1w` were treated as 30 days, which gave a wrong pace.
 - For team keys, a timeout of the user lookup no longer fails the whole refresh when the key or team member budget
-  is known.
+  is known. Without any limit, the app then shows the team member spend.
+- For team keys, a timeout of `/team/info` or `/team/{id}/members/me` no longer fails the whole refresh; the other
+  budget level is still shown. The app asks `/team/info` without the member list, so large teams answer faster.
+- With a Buddhist, Japanese or other non-Gregorian calendar in System Settings, the app asked LiteLLM for wrong dates
+  and showed empty charts and wrong years in the dashboard.
 - Temporary budget increases with an expiry such as `2026-12-01 10:00` (space instead of `T`, no seconds) are now
   counted, like LiteLLM does.
 - Daily activity cached for another LiteLLM user is no longer shown after the key changes users.

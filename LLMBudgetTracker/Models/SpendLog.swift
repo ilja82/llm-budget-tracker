@@ -175,9 +175,7 @@ struct DailySpendData: Codable {
 
     /// Convert to SpendLog so downstream consumers (charts, pacing) are unchanged.
     func toSpendLog() -> SpendLog? {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
+        let f = DayKeyFormatter.make()
         guard let parsedDate = f.date(from: date) else { return nil }
         return SpendLog(
             spend: metrics.spend,

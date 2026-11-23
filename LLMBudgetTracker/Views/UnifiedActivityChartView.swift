@@ -7,12 +7,7 @@ struct UnifiedActivityChartView: View {
     @AppStorage(StorageKeys.ChartUI.unifiedChartModel) private var selectedModel: String = ""
     @State private var hoveredDay: Date?
 
-    private static let dateFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
-    }()
+    private static let dateFmt = DayKeyFormatter.make()
 
     /// Convert a UTC "yyyy-MM-dd" day key into local midnight so chart bars align
     /// with `Calendar.current` .day buckets and with `currentPeriodStart` / safe lines.

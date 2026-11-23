@@ -124,10 +124,12 @@ enum DashboardStats {
     static func date(from value: String, calendar: Calendar) -> Date? {
         let pieces = value.split(separator: "-").compactMap { Int($0) }
         guard pieces.count == 3 else { return nil }
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
         let components = DateComponents(year: pieces[0], month: pieces[1], day: pieces[2], hour: 12)
-        guard let date = calendar.date(from: components),
-              calendar.component(.month, from: date) == pieces[1],
-              calendar.component(.day, from: date) == pieces[2] else { return nil }
+        guard let date = gregorian.date(from: components),
+              gregorian.component(.month, from: date) == pieces[1],
+              gregorian.component(.day, from: date) == pieces[2] else { return nil }
         return date
     }
 

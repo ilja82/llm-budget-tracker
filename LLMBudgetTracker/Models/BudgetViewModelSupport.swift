@@ -53,12 +53,7 @@ enum FakeDailyActivity {
         "minimax-m2.1"
     ]
 
-    private static let dailyFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f
-    }()
+    private static let dailyFmt = DayKeyFormatter.make()
 
     static func generate(daysPassed: Int, totalSpend: Double) -> [DailySpendData] {
         guard daysPassed > 0 else { return [] }

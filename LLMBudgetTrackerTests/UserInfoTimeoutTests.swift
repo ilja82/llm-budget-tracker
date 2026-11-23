@@ -10,10 +10,21 @@ final class UserInfoTimeoutTests: XCTestCase {
         XCTAssertEqual(result.info.userId, "fixture-user")
     }
 
-    func testTeamKeyWithoutAnyLimitStillFailsWhenUserInfoTimesOut() async {
+    func testTeamKeyWithoutAnyLimitFallsBackToTheMemberSpendWhenUserInfoTimesOut() async throws {
+        let result = try await makeAPI().fetchResolvedBudgetInfo(
+            baseURL: "https://team-no-limit.invalid", apiKey: "fixture-key"
+        )
+
+        XCTAssertEqual(result.endpoint, "/team/team-fixture/members/me")
+        XCTAssertEqual(result.info.spend, 3)
+        XCTAssertNil(result.info.maxBudget)
+        XCTAssertTrue(result.limitSources.contains("/v2/user/info: unavailable"), result.limitSources)
+    }
+
+    func testTeamKeyWithoutAnyLimitFailsWhenUserInfoAndMemberBothFail() async {
         do {
-            _ = try await makeAPI().fetchResolvedBudgetInfo(baseURL: "https://team-no-limit.invalid", apiKey: "fixture-key")
-            XCTFail("Without a limit the user spend is needed, so the timeout must fail the refresh")
+            _ = try await makeAPI().fetchResolvedBudgetInfo(baseURL: "https://team-all-down.invalid", apiKey: "fixture-key")
+            XCTFail("Without the user and the member spend there is nothing to show, so the refresh must fail")
         } catch let error as URLError {
             XCTAssertEqual(error.code, .timedOut)
         } catch {
@@ -49,7 +60,8 @@ private final class UserInfoTimeoutURLProtocol: URLProtocol, @unchecked Sendable
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return
         }
-        guard url.path != "/v2/user/info" else {
+        let memberDown = url.host == "team-all-down.invalid" && url.path == "/team/team-fixture/members/me"
+        guard url.path != "/v2/user/info", !memberDown else {
             client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
             return
         }
@@ -75,7 +87,7 @@ private final class UserInfoTimeoutURLProtocol: URLProtocol, @unchecked Sendable
         case ("team.invalid", "/team/team-fixture/members/me"):
             return #"{"user_id":"fixture-user","spend":4,"litellm_budget_table":{"max_budget":50}}"#
         case (_, "/team/team-fixture/members/me"):
-            return #"{"user_id":"fixture-user","spend":0,"litellm_budget_table":null}"#
+            return #"{"user_id":"fixture-user","spend":3,"litellm_budget_table":null}"#
         case (_, "/team/info"):
             return #"{"team_id":"team-fixture","team_info":{"spend":9,"max_budget":null}}"#
         default:
