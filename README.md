@@ -6,6 +6,25 @@ LiteLLM proxy and displays daily activity charts.
 ![macOS 27+](https://img.shields.io/badge/macOS-27%2B-blue)
 ![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange)
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/Screenshot_1.png" alt="Popover with the status On track, a green budget bar and spend per model" width="240"></td>
+    <td align="center"><img src="docs/Screenshot_2.png" alt="Popover with the status Near limit, an orange budget bar and a daily spend chart" width="240"></td>
+    <td align="center"><img src="docs/Screenshot_3.png" alt="Popover with the status Likely to exceed, a red budget bar and a daily spend chart" width="240"></td>
+  </tr>
+  <tr>
+    <td align="center">On track</td>
+    <td align="center">Near limit</td>
+    <td align="center">Likely to exceed</td>
+  </tr>
+</table>
+
+<p>
+  <img src="docs/Screenshot_4.png" alt="Dashboard window with spend statistics, daily tokens, daily requests, spend share by model and spend by weekday" width="600">
+  <br>
+  Dashboard window
+</p>
+
 ## What it does
 
 - Shows current budget usage directly in the macOS status bar.
