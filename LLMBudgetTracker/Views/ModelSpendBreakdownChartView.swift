@@ -1,4 +1,3 @@
-import Charts
 import SwiftUI
 
 struct ModelSpendBreakdownChartView: View {
@@ -6,13 +5,10 @@ struct ModelSpendBreakdownChartView: View {
     @AppStorage(StorageKeys.ChartUI.modelSpendRange) private var rangeRaw: String = ModelRange.thisMonth.rawValue
 
     private enum Layout {
-        static let rowHeight: CGFloat = 26
         static let compactThreshold = 5
-        static let axisOverhead: CGFloat = 28
         static let compactHeight: CGFloat = 180
-        static var maxVisibleRows: Int {
-            max(1, Int((compactHeight - axisOverhead) / rowHeight))
-        }
+        static let rowSpacing: CGFloat = 8
+        static let barHeight: CGFloat = 6
     }
 
     private var range: ModelRange {
@@ -49,52 +45,55 @@ struct ModelSpendBreakdownChartView: View {
         if totals.isEmpty {
             emptyState
         } else if totals.count <= Layout.compactThreshold {
-            chart(for: totals)
-                .frame(height: Layout.compactHeight)
+            rows(for: totals)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(accessibilityLabel(totals: totals))
         } else {
-            let visible = min(totals.count, Layout.maxVisibleRows)
-            chart(for: totals)
-                .chartScrollableAxes(.vertical)
-                .chartYVisibleDomain(length: visible)
-                .frame(height: Layout.compactHeight)
-                .accessibilityLabel(accessibilityLabel(totals: totals))
+            ScrollView(.vertical) {
+                rows(for: totals)
+                    .padding(.trailing, 12)
+            }
+            .frame(height: Layout.compactHeight)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel(totals: totals))
         }
     }
 
-    private func chart(for totals: [(model: String, spend: Double)]) -> some View {
-        Chart(totals, id: \.model) { entry in
-            BarMark(
-                x: .value("Spend", entry.spend),
-                y: .value("Model", entry.model)
-            )
-            .foregroundStyle(Color.accentColor)
-            .cornerRadius(2)
-            .annotation(position: .trailing, alignment: .leading) {
-                Text(String(format: "$%.2f", entry.spend))
-                    .font(.caption2)
+    private func rows(for totals: [(model: String, spend: Double)]) -> some View {
+        let largest = totals.map(\.spend).max() ?? 0
+        return VStack(alignment: .leading, spacing: Layout.rowSpacing) {
+            ForEach(totals, id: \.model) { entry in
+                row(
+                    model: entry.model,
+                    spend: entry.spend,
+                    fraction: ModelSpendScale.fraction(of: entry.spend, max: largest)
+                )
+            }
+        }
+    }
+
+    private func row(model: String, spend: Double, fraction: Double) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(model)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Text(String(format: "$%.2f", spend))
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-        }
-        .chartXAxis {
-            AxisMarks(position: .bottom) { value in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel {
-                    if let val = value.as(Double.self) {
-                        Text(String(format: "$%.0f", val)).font(.caption2)
-                    }
+            .font(.caption)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.quaternary)
+                    Capsule()
+                        .fill(Color.accentColor)
+                        .frame(width: geo.size.width * fraction)
                 }
             }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading) { _ in
-                AxisValueLabel()
-                    .font(.caption2)
-            }
-        }
-        .chartPlotStyle { plot in
-            plot.padding(.trailing, 48)
+            .frame(height: Layout.barHeight)
         }
     }
 
