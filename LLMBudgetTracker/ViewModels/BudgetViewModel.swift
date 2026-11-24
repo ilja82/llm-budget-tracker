@@ -33,6 +33,7 @@ final class BudgetViewModel {
     }
 
     var iconStyle = MenuBarIconStyle.load() { didSet { iconStyle.save() } }
+    var linePosition = MenuBarLinePosition.load() { didSet { linePosition.save() } }
     var dailyActivityEnabled: Bool = UserDefaults.standard.bool(forKey: StorageKeys.App.dailyActivityEnabled) {
         didSet { UserDefaults.standard.set(dailyActivityEnabled, forKey: StorageKeys.App.dailyActivityEnabled) }
     }

@@ -66,6 +66,7 @@ targets:
       - path: LLMBudgetTracker/Models/MenuBarDisplayMode.swift
       - path: LLMBudgetTracker/Models/StorageKeys.swift
       - path: LLMBudgetTracker/Models/MenuBarIconStyle.swift
+      - path: LLMBudgetTracker/Models/MenuBarLinePosition.swift
       - path: LLMBudgetTracker/Services/MenuBarIconRenderer.swift
       - path: LLMBudgetTracker/Models/UpdatePolicy.swift
       - path: LLMBudgetTracker/Services/UpdateChecker.swift

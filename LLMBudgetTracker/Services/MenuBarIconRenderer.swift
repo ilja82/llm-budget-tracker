@@ -1,13 +1,20 @@
 import AppKit
 
 enum MenuBarIconRenderer {
-    static func image(style: MenuBarIconStyle, progress: Double, color: NSColor, label: String) -> NSImage {
+    static func image(
+        style: MenuBarIconStyle,
+        progress: Double,
+        color: NSColor,
+        label: String,
+        linePosition: MenuBarLinePosition = .below
+    ) -> NSImage {
         let clamped = CGFloat(min(1.0, max(0.0, progress)))
         switch style {
         case .bar: return barImage(progress: progress, color: color, label: label)
         case .ring: return ringImage(progress: clamped, color: color, label: label)
         case .dot: return dotImage(color: color, label: label)
         case .textOnly: return textImage(label: label)
+        case .line: return lineImage(progress: clamped, label: label, position: linePosition)
         }
     }
 
@@ -86,6 +93,39 @@ enum MenuBarIconRenderer {
         let width = max(ceil(textSize.width) + 8, 16)
         return NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
             text.draw(at: NSPoint(x: (rect.width - textSize.width) / 2, y: (rect.height - textSize.height) / 2))
+            return true
+        }
+    }
+
+    private static func lineImage(progress: CGFloat, label: String, position: MenuBarLinePosition) -> NSImage {
+        let lineHeight: CGFloat = 2
+        let gap: CGFloat = 1
+        let fontSize = ((height - 2) * 0.62).rounded()
+        let text = labelString(label, fontSize: fontSize)
+        let textSize = text.size()
+        let width = max(ceil(textSize.width) + 8, 16)
+        return NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+            let lineY = position == .below ? 0 : rect.height - lineHeight
+            let track = CGRect(x: 2, y: lineY, width: rect.width - 4, height: lineHeight)
+            let trackPath = NSBezierPath(roundedRect: track, xRadius: lineHeight / 2, yRadius: lineHeight / 2)
+            NSColor.quaternaryLabelColor.setFill()
+            trackPath.fill()
+
+            let fillWidth = track.width * progress
+            if fillWidth > 0 {
+                NSGraphicsContext.saveGraphicsState()
+                trackPath.addClip()
+                NSColor.systemGreen.setFill()
+                NSBezierPath(rect: CGRect(x: track.minX, y: track.minY, width: fillWidth, height: lineHeight)).fill()
+                NSGraphicsContext.restoreGraphicsState()
+            }
+
+            let textAreaHeight = rect.height - lineHeight - gap
+            let textAreaY = position == .below ? lineHeight + gap : 0
+            text.draw(at: NSPoint(
+                x: (rect.width - textSize.width) / 2,
+                y: textAreaY + (textAreaHeight - textSize.height) / 2
+            ))
             return true
         }
     }
