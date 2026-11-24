@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 #### Added
 
 - **Quit App** button next to "Settings" in the popover header.
+- **Line** menu bar icon style: a slim line above or below the number fills green with the used (or remaining)
+  share. "Line position" in Settings > Display picks Above or Below.
 - **Dashboard window:** "Details" below the per-model spend chart opens a resizable window with two pages, using the
   same range as the per-model chart. "Daily costs" lists each day with the total reported by LiteLLM and its parts per
   model ($ and % of the day). Spend LiteLLM does not attribute to a model shows as "Other / unattributed" (or

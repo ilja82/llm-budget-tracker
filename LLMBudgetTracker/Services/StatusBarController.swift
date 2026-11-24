@@ -70,7 +70,8 @@ final class StatusBarController {
             style: viewModel.iconStyle,
             progress: viewModel.budgetPercentage,
             color: viewModel.pacingBarNSColor,
-            label: viewModel.menuBarText
+            label: viewModel.menuBarText,
+            linePosition: viewModel.linePosition
         )
         img.isTemplate = false
         button.image = img
@@ -86,6 +87,7 @@ final class StatusBarController {
             _ = viewModel.budgetPercentage
             _ = viewModel.menuBarText
             _ = viewModel.iconStyle
+            _ = viewModel.linePosition
             _ = viewModel.pacingBarNSColor
             _ = viewModel.menuBarTooltip
             _ = viewModel.appState

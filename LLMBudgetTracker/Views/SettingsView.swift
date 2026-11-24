@@ -172,6 +172,14 @@ struct SettingsView: View {
                     Text(style.label).tag(style)
                 }
             }
+            if viewModel.iconStyle == .line {
+                Picker("Line position", selection: vm.linePosition) {
+                    ForEach(MenuBarLinePosition.allCases) { position in
+                        Text(position.label).tag(position)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
             Toggle("Show remaining instead of used", isOn: vm.showRemaining)
             Text("The menu bar shows the remaining budget and the popover shows the spent amount.")
                 .font(.caption)

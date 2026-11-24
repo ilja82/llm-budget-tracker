@@ -80,8 +80,8 @@ final class MenuBarIconStyleTests: XCTestCase {
     }
 
     func testCasesIdsLabelsAndDefault() {
-        XCTAssertEqual(MenuBarIconStyle.allCases, [.bar, .ring, .dot, .textOnly])
-        XCTAssertEqual(Set(MenuBarIconStyle.allCases.map(\.id)).count, 4)
+        XCTAssertEqual(MenuBarIconStyle.allCases, [.bar, .ring, .dot, .textOnly, .line])
+        XCTAssertEqual(Set(MenuBarIconStyle.allCases.map(\.id)).count, 5)
         for style in MenuBarIconStyle.allCases {
             XCTAssertFalse(style.label.isEmpty)
         }
