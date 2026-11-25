@@ -80,12 +80,18 @@ final class MenuBarIconStyleTests: XCTestCase {
     }
 
     func testCasesIdsLabelsAndDefault() {
-        XCTAssertEqual(MenuBarIconStyle.allCases, [.bar, .ring, .dot, .textOnly, .line])
-        XCTAssertEqual(Set(MenuBarIconStyle.allCases.map(\.id)).count, 5)
+        XCTAssertEqual(MenuBarIconStyle.allCases, [.bar, .ring, .dot, .textOnly, .line, .coloredText])
+        XCTAssertEqual(Set(MenuBarIconStyle.allCases.map(\.id)).count, 6)
         for style in MenuBarIconStyle.allCases {
             XCTAssertFalse(style.label.isEmpty)
         }
         XCTAssertEqual(MenuBarIconStyle(storedValue: nil), .bar)
+    }
+
+    func testColoredTextStyleStorage() {
+        XCTAssertEqual(MenuBarIconStyle.coloredText.label, "Colored text")
+        XCTAssertEqual(MenuBarIconStyle(storedValue: "coloredText"), .coloredText)
+        XCTAssertEqual(MenuBarIconStyle(storedValue: "unknown"), .bar)
     }
 
     func testMissingStoredValueLoadsBar() throws {
@@ -119,7 +125,7 @@ final class MenuBarIconStyleTests: XCTestCase {
                 let image = MenuBarIconRenderer.image(style: style, progress: progress, color: .systemGreen, label: "")
                 XCTAssertEqual(image.size.height, NSStatusBar.system.thickness, "\(style)")
                 XCTAssertGreaterThan(image.size.width, 0, "\(style)")
-                if style != .textOnly {
+                if style != .textOnly && style != .coloredText {
                     XCTAssertGreaterThan(try inkedPixelCount(of: image, minimumAlpha: 0), 0, "\(style) \(progress)")
                 }
             }
@@ -190,5 +196,68 @@ final class MenuBarIconStyleTests: XCTestCase {
         let barInk = try inkedPixelCount(of: bar)
         let dotInk = try inkedPixelCount(of: dot)
         XCTAssertNotEqual(barInk, dotInk)
+    }
+
+    private struct HueCounts {
+        var red = 0
+        var orange = 0
+        var green = 0
+    }
+
+    private func hueCounts(of image: NSImage) throws -> HueCounts {
+        let raster = try pixels(of: image)
+        var counts = HueCounts()
+        for x in 0..<raster.width {
+            for y in 0..<raster.height {
+                let pixel = raster.at(x, y)
+                guard pixel.alpha > 0.9 else { continue }
+                if pixel.red > 0.8 && pixel.green < 0.25 && pixel.blue < 0.25 { counts.red += 1 }
+                if pixel.red > 0.8 && (0.4..<0.65).contains(pixel.green) && pixel.blue < 0.25 { counts.orange += 1 }
+                if pixel.green > 0.8 && pixel.red < 0.25 && pixel.blue < 0.25 { counts.green += 1 }
+            }
+        }
+        return counts
+    }
+
+    func testColoredTextDrawsLabelInPassedColor() throws {
+        let red = NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
+        let orange = NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)
+        let green = NSColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
+        let redCounts = try hueCounts(of: MenuBarIconRenderer.image(
+            style: .coloredText, progress: 0.5, color: red, label: "$12.34"))
+        XCTAssertGreaterThan(redCounts.red, 0)
+        XCTAssertEqual(redCounts.orange + redCounts.green, 0)
+        let orangeCounts = try hueCounts(of: MenuBarIconRenderer.image(
+            style: .coloredText, progress: 0.5, color: orange, label: "$12.34"))
+        XCTAssertGreaterThan(orangeCounts.orange, 0)
+        XCTAssertEqual(orangeCounts.red + orangeCounts.green, 0)
+        let greenCounts = try hueCounts(of: MenuBarIconRenderer.image(
+            style: .coloredText, progress: 0.5, color: green, label: "$12.34"))
+        XCTAssertGreaterThan(greenCounts.green, 0)
+        XCTAssertEqual(greenCounts.red + greenCounts.orange, 0)
+        let blank = MenuBarIconRenderer.image(style: .coloredText, progress: 0.5, color: red, label: "")
+        XCTAssertEqual(try inkedPixelCount(of: blank, minimumAlpha: 0), 0)
+    }
+
+    func testColoredTextMatchesTextOnlyWidthAndTextOnlyStaysNeutral() throws {
+        let colored = MenuBarIconRenderer.image(style: .coloredText, progress: 0.5, color: pacingColor, label: "$12.34")
+        let plain = MenuBarIconRenderer.image(style: .textOnly, progress: 0.5, color: pacingColor, label: "$12.34")
+        XCTAssertEqual(colored.size, plain.size)
+        XCTAssertEqual(try pacingColoredPixelCount(of: plain, xRange: 0..<Int(plain.size.width)), 0)
+        XCTAssertFalse(colored.isTemplate)
+    }
+
+    func testPacingStatusColorsFeedColoredText() throws {
+        let expected: [(PacingStatus, NSColor)] = [
+            (.underPace, .systemGreen), (.onTrack, .systemGreen), (.nearLimit, .systemOrange),
+            (.overPace, .systemRed), (.unknown, .systemGray)
+        ]
+        for (status, color) in expected {
+            XCTAssertEqual(status.nsColor, color, "\(status)")
+            let image = MenuBarIconRenderer.image(
+                style: .coloredText, progress: 0.5, color: status.nsColor, label: "42%"
+            )
+            XCTAssertGreaterThan(try inkedPixelCount(of: image), 0, "\(status)")
+        }
     }
 }

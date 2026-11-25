@@ -15,6 +15,7 @@ enum MenuBarIconRenderer {
         case .dot: return dotImage(color: color, label: label)
         case .textOnly: return textImage(label: label)
         case .line: return lineImage(progress: clamped, label: label, position: linePosition)
+        case .coloredText: return textImage(label: label, color: color)
         }
     }
 
@@ -24,10 +25,14 @@ enum MenuBarIconRenderer {
         NSFont.monospacedSystemFont(ofSize: size, weight: .semibold)
     }
 
-    private static func labelString(_ label: String, fontSize: CGFloat) -> NSAttributedString {
+    private static func labelString(
+        _ label: String,
+        fontSize: CGFloat,
+        color: NSColor = .labelColor
+    ) -> NSAttributedString {
         NSAttributedString(
             string: label,
-            attributes: [.font: labelFont(size: fontSize), .foregroundColor: NSColor.labelColor]
+            attributes: [.font: labelFont(size: fontSize), .foregroundColor: color]
         )
     }
 
@@ -86,9 +91,9 @@ enum MenuBarIconRenderer {
         }
     }
 
-    private static func textImage(label: String) -> NSImage {
+    private static func textImage(label: String, color: NSColor = .labelColor) -> NSImage {
         let fontSize = ((height - 2) * 0.62).rounded()
-        let text = labelString(label, fontSize: fontSize)
+        let text = labelString(label, fontSize: fontSize, color: color)
         let textSize = text.size()
         let width = max(ceil(textSize.width) + 8, 16)
         return NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in

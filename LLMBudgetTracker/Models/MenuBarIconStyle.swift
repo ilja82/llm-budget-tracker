@@ -6,6 +6,7 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
     case dot
     case textOnly
     case line
+    case coloredText
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
         case .dot: return "Dot"
         case .textOnly: return "Text only"
         case .line: return "Line"
+        case .coloredText: return "Colored text"
         }
     }
 

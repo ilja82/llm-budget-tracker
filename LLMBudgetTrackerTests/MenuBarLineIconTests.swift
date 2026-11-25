@@ -93,7 +93,7 @@ final class MenuBarLineIconTests: XCTestCase {
     }
 
     func testLineStyleCaseAndStorage() throws {
-        XCTAssertEqual(MenuBarIconStyle.allCases, [.bar, .ring, .dot, .textOnly, .line])
+        XCTAssertEqual(MenuBarIconStyle.allCases, [.bar, .ring, .dot, .textOnly, .line, .coloredText])
         XCTAssertEqual(MenuBarIconStyle.line.rawValue, "line")
         XCTAssertEqual(MenuBarIconStyle.line.label, "Line")
         XCTAssertEqual(MenuBarIconStyle(storedValue: "line"), .line)
