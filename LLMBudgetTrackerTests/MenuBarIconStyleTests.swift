@@ -198,13 +198,16 @@ final class MenuBarIconStyleTests: XCTestCase {
         XCTAssertNotEqual(barInk, dotInk)
     }
 
-    private func solidInk(of image: NSImage) throws -> [Pixel] {
+    private let faintAlpha: CGFloat = 0.2
+    private let minimumVisiblePixels = 20
+
+    private func visibleInk(of image: NSImage) throws -> [Pixel] {
         let raster = try pixels(of: image)
         var ink: [Pixel] = []
         for x in 0..<raster.width {
             for y in 0..<raster.height {
                 let pixel = raster.at(x, y)
-                if pixel.alpha > 0.9 { ink.append(pixel) }
+                if pixel.alpha >= faintAlpha { ink.append(pixel) }
             }
         }
         return ink
@@ -212,13 +215,14 @@ final class MenuBarIconStyleTests: XCTestCase {
 
     private func inkMask(of image: NSImage) throws -> [Bool] {
         let raster = try pixels(of: image)
-        var mask: [Bool] = []
+        var alphas: [CGFloat] = []
         for x in 0..<raster.width {
             for y in 0..<raster.height {
-                mask.append(raster.at(x, y).alpha > 0.9)
+                alphas.append(raster.at(x, y).alpha)
             }
         }
-        return mask
+        let threshold = (alphas.max() ?? 0) / 2
+        return alphas.map { $0 > 0 && $0 >= threshold }
     }
 
     private func swatch(of color: NSColor) throws -> Pixel {
@@ -232,16 +236,21 @@ final class MenuBarIconStyleTests: XCTestCase {
 
     private func share(of ink: [Pixel], matching color: NSColor) throws -> Double {
         let reference = try swatch(of: color)
-        let matching = ink.filter {
-            abs($0.red - reference.red) < 0.06 && abs($0.green - reference.green) < 0.06
-                && abs($0.blue - reference.blue) < 0.06
+        var matching: CGFloat = 0
+        var total: CGFloat = 0
+        for pixel in ink {
+            total += pixel.alpha
+            if abs(pixel.red - reference.red) < 0.06 && abs(pixel.green - reference.green) < 0.06
+                && abs(pixel.blue - reference.blue) < 0.06 {
+                matching += pixel.alpha
+            }
         }
-        return Double(matching.count) / Double(max(ink.count, 1))
+        return Double(matching / max(total, 0.0001))
     }
 
-    private func assertInkDominated(by color: NSColor, image: NSImage, _ message: String) throws {
-        let ink = try solidInk(of: image)
-        XCTAssertGreaterThan(ink.count, 0, message)
+    private func assertInk(of image: NSImage, matches color: NSColor, _ message: String) throws {
+        let ink = try visibleInk(of: image)
+        XCTAssertGreaterThanOrEqual(ink.count, minimumVisiblePixels, message)
         XCTAssertGreaterThanOrEqual(try share(of: ink, matching: color), 0.9, message)
     }
 
@@ -253,7 +262,7 @@ final class MenuBarIconStyleTests: XCTestCase {
         ]
         for color in colors {
             let image = MenuBarIconRenderer.image(style: .coloredText, progress: 0.5, color: color, label: "$12.34")
-            try assertInkDominated(by: color, image: image, "\(color)")
+            try assertInk(of: image, matches: color, "\(color)")
         }
         let blank = MenuBarIconRenderer.image(style: .coloredText, progress: 0.5, color: colors[0], label: "")
         XCTAssertEqual(try inkedPixelCount(of: blank, minimumAlpha: 0), 0)
@@ -264,10 +273,10 @@ final class MenuBarIconStyleTests: XCTestCase {
         let plain = MenuBarIconRenderer.image(style: .textOnly, progress: 0.5, color: pacingColor, label: "$12.34")
         XCTAssertEqual(colored.size, plain.size)
         XCTAssertFalse(colored.isTemplate)
-        XCTAssertEqual(try inkMask(of: colored), try inkMask(of: plain))
-        let plainInk = try solidInk(of: plain)
-        XCTAssertGreaterThan(plainInk.count, 0)
-        XCTAssertGreaterThanOrEqual(try share(of: plainInk, matching: .labelColor), 0.9)
+        let coloredMask = try inkMask(of: colored)
+        XCTAssertGreaterThanOrEqual(coloredMask.filter { $0 }.count, minimumVisiblePixels)
+        XCTAssertEqual(coloredMask, try inkMask(of: plain))
+        try assertInk(of: plain, matches: .labelColor, "textOnly")
         XCTAssertEqual(try pacingColoredPixelCount(of: plain, xRange: 0..<Int(plain.size.width)), 0)
     }
 
@@ -281,7 +290,7 @@ final class MenuBarIconStyleTests: XCTestCase {
             let image = MenuBarIconRenderer.image(
                 style: .coloredText, progress: 0.5, color: status.nsColor, label: "42%"
             )
-            try assertInkDominated(by: color, image: image, "\(status)")
+            try assertInk(of: image, matches: color, "\(status)")
         }
     }
 
@@ -289,6 +298,6 @@ final class MenuBarIconStyleTests: XCTestCase {
         let image = MenuBarIconRenderer.image(
             style: .coloredText, progress: 0, color: PacingStatus.unknown.nsColor, label: "\u{23F3}"
         )
-        try assertInkDominated(by: .systemGray, image: image, "offline label")
+        try assertInk(of: image, matches: .systemGray, "offline label")
     }
 }
