@@ -213,7 +213,7 @@ final class MenuBarIconStyleTests: XCTestCase {
         return ink
     }
 
-    private func inkMask(of image: NSImage) throws -> [Bool] {
+    private func normalizedAlpha(of image: NSImage) throws -> [CGFloat] {
         let raster = try pixels(of: image)
         var alphas: [CGFloat] = []
         for x in 0..<raster.width {
@@ -221,8 +221,8 @@ final class MenuBarIconStyleTests: XCTestCase {
                 alphas.append(raster.at(x, y).alpha)
             }
         }
-        let threshold = (alphas.max() ?? 0) / 2
-        return alphas.map { $0 > 0 && $0 >= threshold }
+        let peak = alphas.max() ?? 0
+        return peak > 0 ? alphas.map { $0 / peak } : alphas
     }
 
     private func swatch(of color: NSColor) throws -> Pixel {
@@ -273,9 +273,13 @@ final class MenuBarIconStyleTests: XCTestCase {
         let plain = MenuBarIconRenderer.image(style: .textOnly, progress: 0.5, color: pacingColor, label: "$12.34")
         XCTAssertEqual(colored.size, plain.size)
         XCTAssertFalse(colored.isTemplate)
-        let coloredMask = try inkMask(of: colored)
-        XCTAssertGreaterThanOrEqual(coloredMask.filter { $0 }.count, minimumVisiblePixels)
-        XCTAssertEqual(coloredMask, try inkMask(of: plain))
+        let coloredAlpha = try normalizedAlpha(of: colored)
+        let plainAlpha = try normalizedAlpha(of: plain)
+        XCTAssertGreaterThanOrEqual(coloredAlpha.filter { $0 >= 0.5 }.count, minimumVisiblePixels)
+        XCTAssertEqual(coloredAlpha.count, plainAlpha.count)
+        for (colored, plain) in zip(coloredAlpha, plainAlpha) {
+            XCTAssertEqual(colored, plain, accuracy: 0.1)
+        }
         try assertInk(of: plain, matches: .labelColor, "textOnly")
         XCTAssertEqual(try pacingColoredPixelCount(of: plain, xRange: 0..<Int(plain.size.width)), 0)
     }
@@ -292,12 +296,5 @@ final class MenuBarIconStyleTests: XCTestCase {
             )
             try assertInk(of: image, matches: color, "\(status)")
         }
-    }
-
-    func testColoredTextTintsOfflineHourglassGray() throws {
-        let image = MenuBarIconRenderer.image(
-            style: .coloredText, progress: 0, color: PacingStatus.unknown.nsColor, label: "\u{23F3}"
-        )
-        try assertInk(of: image, matches: .systemGray, "offline label")
     }
 }

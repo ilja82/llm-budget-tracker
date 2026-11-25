@@ -15,7 +15,7 @@ enum MenuBarIconRenderer {
         case .dot: return dotImage(color: color, label: label)
         case .textOnly: return textImage(label: label)
         case .line: return lineImage(progress: clamped, label: label, position: linePosition)
-        case .coloredText: return textImage(label: label, tint: color)
+        case .coloredText: return textImage(label: label, color: color)
         }
     }
 
@@ -91,17 +91,13 @@ enum MenuBarIconRenderer {
         }
     }
 
-    private static func textImage(label: String, tint: NSColor? = nil) -> NSImage {
+    private static func textImage(label: String, color: NSColor = .labelColor) -> NSImage {
         let fontSize = ((height - 2) * 0.62).rounded()
-        let text = labelString(label, fontSize: fontSize, color: tint == nil ? .labelColor : .black)
+        let text = labelString(label, fontSize: fontSize, color: color)
         let textSize = text.size()
         let width = max(ceil(textSize.width) + 8, 16)
         return NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
             text.draw(at: NSPoint(x: (rect.width - textSize.width) / 2, y: (rect.height - textSize.height) / 2))
-            if let tint {
-                tint.setFill()
-                rect.fill(using: .sourceIn)
-            }
             return true
         }
     }
