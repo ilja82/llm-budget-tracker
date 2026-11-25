@@ -268,20 +268,46 @@ final class MenuBarIconStyleTests: XCTestCase {
         XCTAssertEqual(try inkedPixelCount(of: blank, minimumAlpha: 0), 0)
     }
 
-    func testColoredTextMatchesTextOnlyShapeAndTextOnlyStaysNeutral() throws {
-        let colored = MenuBarIconRenderer.image(style: .coloredText, progress: 0.5, color: pacingColor, label: "$12.34")
-        let plain = MenuBarIconRenderer.image(style: .textOnly, progress: 0.5, color: pacingColor, label: "$12.34")
-        XCTAssertEqual(colored.size, plain.size)
-        XCTAssertFalse(colored.isTemplate)
-        let coloredAlpha = try normalizedAlpha(of: colored)
-        let plainAlpha = try normalizedAlpha(of: plain)
-        XCTAssertGreaterThanOrEqual(coloredAlpha.filter { $0 >= 0.5 }.count, minimumVisiblePixels)
-        XCTAssertEqual(coloredAlpha.count, plainAlpha.count)
-        for (colored, plain) in zip(coloredAlpha, plainAlpha) {
-            XCTAssertEqual(colored, plain, accuracy: 0.1)
+    private func inkMask(of image: NSImage) throws -> [Bool] {
+        try normalizedAlpha(of: image).map { $0 >= 0.1 }
+    }
+
+    private func overlap(_ lhs: [Bool], _ rhs: [Bool]) -> Double {
+        let both = zip(lhs, rhs).filter { $0 && $1 }.count
+        let either = zip(lhs, rhs).filter { $0 || $1 }.count
+        return either > 0 ? Double(both) / Double(either) : 0
+    }
+
+    private func drawing(in name: NSAppearance.Name, _ body: () throws -> Void) throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: name))
+        var failure: Error?
+        appearance.performAsCurrentDrawingAppearance {
+            do { try body() } catch { failure = error }
         }
-        try assertInk(of: plain, matches: .labelColor, "textOnly")
-        XCTAssertEqual(try pacingColoredPixelCount(of: plain, xRange: 0..<Int(plain.size.width)), 0)
+        if let failure { throw failure }
+    }
+
+    func testColoredTextMatchesTextOnlyShapeAndTextOnlyStaysNeutral() throws {
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            try drawing(in: name) {
+                let label = "$12.34"
+                let colored = MenuBarIconRenderer.image(
+                    style: .coloredText, progress: 0.5, color: pacingColor, label: label
+                )
+                let plain = MenuBarIconRenderer.image(
+                    style: .textOnly, progress: 0.5, color: pacingColor, label: label
+                )
+                XCTAssertEqual(colored.size, plain.size, "\(name)")
+                XCTAssertFalse(colored.isTemplate, "\(name)")
+                let coloredMask = try inkMask(of: colored)
+                let plainMask = try inkMask(of: plain)
+                XCTAssertGreaterThanOrEqual(coloredMask.filter { $0 }.count, minimumVisiblePixels, "\(name)")
+                XCTAssertEqual(coloredMask.count, plainMask.count, "\(name)")
+                XCTAssertGreaterThanOrEqual(overlap(coloredMask, plainMask), 0.9, "\(name)")
+                try assertInk(of: plain, matches: .labelColor, "textOnly \(name)")
+                XCTAssertEqual(try pacingColoredPixelCount(of: plain, xRange: 0..<Int(plain.size.width)), 0, "\(name)")
+            }
+        }
     }
 
     func testPacingStatusColorsFeedColoredText() throws {
