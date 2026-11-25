@@ -229,23 +229,24 @@ final class MenuBarLineIconTests: XCTestCase {
 
     private func fillMatchRatio(_ color: NSColor, position: MenuBarLinePosition) throws -> Double {
         let expected = try swatch(color)
-        let raster = try raster(of: lineImage(progress: 0.5, color: color, position: position))
-        let rows = lineRowRange(raster, position)
-        var total = 0
-        var matching = 0
-        for row in rows {
-            for x in 4..<Int(Double(raster.width) * 0.4) {
-                let pixel = raster.at(x, row)
-                guard pixel.alpha > 0.5 else { continue }
-                total += 1
-                let close = abs(pixel.red - expected.red) < 0.1
-                    && abs(pixel.green - expected.green) < 0.1
-                    && abs(pixel.blue - expected.blue) < 0.1
-                if close { matching += 1 }
+        let half = try raster(of: lineImage(progress: 0.5, color: color, position: position))
+        let full = try raster(of: lineImage(progress: 1, color: color, position: position))
+        var total: CGFloat = 0
+        var matching: CGFloat = 0
+        for row in lineRowRange(half, position) {
+            for x in 0..<(half.width / 2) {
+                let weight = full.at(x, row).alpha
+                guard weight > 0.02 else { continue }
+                let pixel = half.at(x, row)
+                total += weight
+                let close = abs(pixel.red - expected.red) < 0.06
+                    && abs(pixel.green - expected.green) < 0.06
+                    && abs(pixel.blue - expected.blue) < 0.06
+                if close { matching += min(pixel.alpha, weight) }
             }
         }
         XCTAssertGreaterThan(total, 4, "\(position)")
-        return total == 0 ? 0 : Double(matching) / Double(total)
+        return Double(matching / max(total, 0.0001))
     }
 
     func testFillTakesPassedColor() throws {
