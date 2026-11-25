@@ -14,7 +14,7 @@ enum MenuBarIconRenderer {
         case .ring: return ringImage(progress: clamped, color: color, label: label)
         case .dot: return dotImage(color: color, label: label)
         case .textOnly: return textImage(label: label)
-        case .line: return lineImage(progress: clamped, label: label, position: linePosition)
+        case .line: return lineImage(progress: clamped, color: color, label: label, position: linePosition)
         case .coloredText: return textImage(label: label, color: color)
         }
     }
@@ -102,7 +102,12 @@ enum MenuBarIconRenderer {
         }
     }
 
-    private static func lineImage(progress: CGFloat, label: String, position: MenuBarLinePosition) -> NSImage {
+    private static func lineImage(
+        progress: CGFloat,
+        color: NSColor,
+        label: String,
+        position: MenuBarLinePosition
+    ) -> NSImage {
         let lineHeight: CGFloat = 2
         let gap: CGFloat = 1
         let fontSize = ((height - 2) * 0.62).rounded()
@@ -120,7 +125,7 @@ enum MenuBarIconRenderer {
             if fillWidth > 0 {
                 NSGraphicsContext.saveGraphicsState()
                 trackPath.addClip()
-                NSColor.systemGreen.setFill()
+                color.setFill()
                 NSBezierPath(rect: CGRect(x: track.minX, y: track.minY, width: fillWidth, height: lineHeight)).fill()
                 NSGraphicsContext.restoreGraphicsState()
             }

@@ -70,11 +70,12 @@ final class MenuBarLineIconTests: XCTestCase {
 
     private func lineImage(
         progress: Double,
+        color: NSColor = .systemGreen,
         label: String = "50%",
         position: MenuBarLinePosition = .below
     ) -> NSImage {
         MenuBarIconRenderer.image(
-            style: .line, progress: progress, color: .systemRed, label: label, linePosition: position
+            style: .line, progress: progress, color: color, label: label, linePosition: position
         )
     }
 
@@ -214,6 +215,62 @@ final class MenuBarLineIconTests: XCTestCase {
             let fallback = MenuBarIconRenderer.image(style: style, progress: 0.5, color: .systemRed, label: "42%")
             XCTAssertEqual(try raster(of: below).pixels, try raster(of: above).pixels, "\(style)")
             XCTAssertEqual(try raster(of: below).pixels, try raster(of: fallback).pixels, "\(style)")
+        }
+    }
+
+    private func swatch(_ color: NSColor) throws -> Pixel {
+        let image = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in
+            color.setFill()
+            rect.fill()
+            return true
+        }
+        return try raster(of: image).at(1, 1)
+    }
+
+    private func fillMatchRatio(_ color: NSColor, position: MenuBarLinePosition) throws -> Double {
+        let expected = try swatch(color)
+        let raster = try raster(of: lineImage(progress: 0.5, color: color, position: position))
+        let rows = lineRowRange(raster, position)
+        var total = 0
+        var matching = 0
+        for row in rows {
+            for x in 4..<Int(Double(raster.width) * 0.4) {
+                let pixel = raster.at(x, row)
+                guard pixel.alpha > 0.5 else { continue }
+                total += 1
+                let close = abs(pixel.red - expected.red) < 0.1
+                    && abs(pixel.green - expected.green) < 0.1
+                    && abs(pixel.blue - expected.blue) < 0.1
+                if close { matching += 1 }
+            }
+        }
+        XCTAssertGreaterThan(total, 4, "\(position)")
+        return total == 0 ? 0 : Double(matching) / Double(total)
+    }
+
+    func testFillTakesPassedColor() throws {
+        for position in MenuBarLinePosition.allCases {
+            for color in [NSColor.systemGreen, .systemOrange, .systemRed] {
+                XCTAssertGreaterThanOrEqual(try fillMatchRatio(color, position: position), 0.9, "\(position) \(color)")
+            }
+        }
+    }
+
+    func testRedFillIsNotGreen() throws {
+        let raster = try raster(of: lineImage(progress: 0.5, color: .systemRed))
+        XCTAssertEqual(greenCount(raster, rows: 0..<raster.height), 0)
+    }
+
+    func testFillFollowsPacingStatusColor() throws {
+        let statuses: [PacingStatus] = [.underPace, .onTrack, .nearLimit, .overPace, .unknown]
+        let expected: [NSColor] = [.systemGreen, .systemGreen, .systemOrange, .systemRed, .systemGray]
+        for (status, color) in zip(statuses, expected) {
+            XCTAssertEqual(status.nsColor, color, "\(status)")
+            for position in MenuBarLinePosition.allCases {
+                XCTAssertGreaterThanOrEqual(
+                    try fillMatchRatio(status.nsColor, position: position), 0.9, "\(status) \(position)"
+                )
+            }
         }
     }
 }
